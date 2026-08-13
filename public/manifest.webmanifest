@@ -1,0 +1,10 @@
+{
+  "name": "AsV_IDE — Local ESP32 Studio",
+  "short_name": "AsV_IDE",
+  "description": "A local-first ESP32 development workspace.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#08161b",
+  "theme_color": "#28e7d1",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}

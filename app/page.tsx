@@ -23,6 +23,9 @@ export default function Home() {
   const [booting, setBooting] = useState(true);
   const [active, setActive] = useState("Explorer");
   const [connected, setConnected] = useState(false);
+  const [deviceName, setDeviceName] = useState("No device attached");
+  const [deviceNote, setDeviceNote] = useState("Connect by USB or Bluetooth");
+  const [terminalNote, setTerminalNote] = useState("Connect a board to begin live serial output.");
   const [aiOpen, setAiOpen] = useState(false);
   const [pluginOpen, setPluginOpen] = useState(false);
   const [flashOpen, setFlashOpen] = useState(false);
@@ -37,6 +40,34 @@ export default function Home() {
     const bootTimer = window.setTimeout(() => setBooting(false), 2100);
     return () => { window.clearInterval(characterTimer); window.clearTimeout(bootTimer); };
   }, []);
+
+  useEffect(() => {
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => undefined);
+  }, []);
+
+  async function connectUsb() {
+    const localBrowser = navigator as Navigator & { serial?: { requestPort: () => Promise<{ open: (options: { baudRate: number }) => Promise<void> }> } };
+    if (!localBrowser.serial) {
+      setTerminalNote("This browser does not support USB serial. Open AsV_IDE in Chrome or Edge on this computer.");
+      return;
+    }
+    try {
+      const port = await localBrowser.serial.requestPort();
+      await port.open({ baudRate: 115200 });
+      setConnected(true); setDeviceName("ESP32 USB serial"); setDeviceNote("USB · 115200 baud");
+      setTerminalNote("USB serial connected locally. Your board is ready for a local build and flash.");
+    } catch { setTerminalNote("USB connection was cancelled or the serial port could not be opened."); }
+  }
+
+  async function pairBluetooth() {
+    const localBrowser = navigator as Navigator & { bluetooth?: { requestDevice: (options: { acceptAllDevices: boolean }) => Promise<{ name?: string }> } };
+    if (!localBrowser.bluetooth) { setTerminalNote("Bluetooth pairing needs Chrome or Edge on this computer."); return; }
+    try {
+      const device = await localBrowser.bluetooth.requestDevice({ acceptAllDevices: true });
+      setConnected(true); setDeviceName(device.name || "ESP32 BLE device"); setDeviceNote("Bluetooth LE paired locally");
+      setTerminalNote("Bluetooth device paired. Install the OTA receiver by USB before sending wireless updates.");
+    } catch { setTerminalNote("Bluetooth pairing was cancelled."); }
+  }
 
   if (booting) return (
     <main className="boot-screen">
@@ -55,7 +86,7 @@ export default function Home() {
         <div className="project-pill"><span className="dot" /> blink_node.ino <kbd>⌘ S</kbd></div>
         <div className="top-actions">
           <button className="board-pill">{liteMode ? "Lite core · 18 MB" : "Full toolchain · 480 MB"} <span>⌄</span></button>
-          <button className={connected ? "connect connected" : "connect"} onClick={() => setConnected(!connected)}>{connected ? "● Connected" : "Connect device"}</button>
+          <button className={connected ? "connect connected" : "connect"} onClick={connected ? () => { setConnected(false); setDeviceName("No device attached"); setDeviceNote("Connect by USB or Bluetooth"); } : connectUsb}>{connected ? "● Connected" : "Connect USB"}</button>
           <button className="avatar">AR</button>
         </div>
       </header>
@@ -83,18 +114,18 @@ export default function Home() {
         </section>
         <aside className="inspector">
           <div className="inspector-head"><span>DEVICE PULSE</span><span className={connected ? "pulse online" : "pulse"}>{connected ? "ONLINE" : "WAITING"}</span></div>
-          <div className="device-card"><div className="chip-art">ESP<br/><b>32</b></div><h3>{connected ? "ESP32 DevKit V1" : "No device attached"}</h3><p>{connected ? "COM3 · 115200 baud" : "Connect by USB or Bluetooth"}</p><button onClick={() => setConnected(!connected)}>{connected ? "Disconnect" : "Find device"}</button><button className="ble-flash" onClick={() => setFlashOpen(true)}>⌁ Bluetooth flash</button></div>
+          <div className="device-card"><div className="chip-art">ESP<br/><b>32</b></div><h3>{connected ? deviceName : "No device attached"}</h3><p>{connected ? deviceNote : "Connect by USB or Bluetooth"}</p><button onClick={connected ? () => setConnected(false) : connectUsb}>{connected ? "Disconnect" : "Connect USB"}</button><button className="ble-flash" onClick={() => setFlashOpen(true)}>⌁ Bluetooth flash</button></div>
           <div className="metrics"><Metric label="FLASH" value="1.2 / 4 MB" width="30%" /><Metric label="HEAP" value="281 KB" width="68%" /><Metric label="CPU" value="240 MHz" width="88%" /></div>
           <button className="ai-card" onClick={() => setAiOpen(true)}><span>✦</span><div><b>AsV Intelligence</b><small>Ask, fix, optimize code</small></div><i>→</i></button>
           <button className={liteMode ? "lite-switch enabled" : "lite-switch"} onClick={() => setLiteMode(!liteMode)}><span>◌</span><div><b>Featherweight mode</b><small>{liteMode ? "Core + active plugins only" : "All offline tools installed"}</small></div><i>{liteMode ? "ON" : "OFF"}</i></button>
         </aside>
       </section>
-      <section className="terminal"><div className="terminal-bar"><div><b>TERMINAL</b><span>OUTPUT</span><span>PROBLEMS <i>0</i></span><span>SERIAL MONITOR</span></div><button>⌄</button></div><div className="terminal-body"><p><b>›</b> Ready to compile <span>blink-node</span> for ESP32 DevKit V1</p><p><b>›</b> Plugin host initialized — 12 extensions available</p><p className="muted">Connect a board to begin live serial output.</p></div></section>
+      <section className="terminal"><div className="terminal-bar"><div><b>TERMINAL</b><span>OUTPUT</span><span>PROBLEMS <i>0</i></span><span>SERIAL MONITOR</span></div><button>⌄</button></div><div className="terminal-body"><p><b>›</b> Ready to compile <span>blink-node</span> for ESP32 DevKit V1</p><p><b>›</b> Local plugin host initialized — 12 extensions available</p><p className="muted">{terminalNote}</p></div></section>
       <footer><div><span className="sync">↻</span> main* &nbsp; <span>◉</span> 0 errors &nbsp; 0 warnings</div><div>ESP32 &nbsp; | &nbsp; UTF-8 &nbsp; | &nbsp; Turbo build engine <b>⚡</b></div></footer>
       <button className="fab" onClick={() => setPluginOpen(true)}>✦ <span>Plugin hub</span></button>
       {aiOpen && <AiModal onClose={() => setAiOpen(false)} />}
       {pluginOpen && <PluginModal onClose={() => setPluginOpen(false)} />}
-      {flashOpen && <FlashModal onClose={() => setFlashOpen(false)} />}
+      {flashOpen && <FlashModal onClose={() => setFlashOpen(false)} onPair={pairBluetooth} />}
     </main>
   );
 }
@@ -104,4 +135,4 @@ function Plugins({onClose}:{onClose:()=>void}) { return <div className="plugin-m
 function Metric({label,value,width}:{label:string,value:string,width:string}) { return <div className="metric"><div><span>{label}</span><b>{value}</b></div><i><em style={{width}} /></i></div>; }
 function AiModal({onClose}:{onClose:()=>void}) { return <div className="modal-back"><section className="modal ai-modal"><button className="modal-close" onClick={onClose}>×</button><div className="modal-icon">✦</div><h2>Connect Gemini</h2><p>Use Gemini to explain, generate, and improve your ESP32 code.</p><label>GEMINI API KEY<input type="password" placeholder="Paste your API key" /></label><small>Your key stays in this browser for this demo. In a production app, keep API keys on your own server—never commit them to GitHub.</small><button className="primary" onClick={onClose}>Save connection</button></section></div>; }
 function PluginModal({onClose}:{onClose:()=>void}) { return <div className="modal-back"><section className="modal plugin-modal"><button className="modal-close" onClick={onClose}>×</button><span className="eyebrow">EXTENSION MARKETPLACE</span><h2>Build your perfect setup.</h2><p>Extend AsV_IDE with tools for hardware, automation, and AI.</p>{[["✦","Gemini Assist","Inline code completion and refactoring"],["◉","Serial Studio","Charts and inspectable live telemetry"],["◫","Home Assistant","Device discovery and YAML helpers"]].map(([a,b,c])=><div className="market-item" key={b}><span>{a}</span><div><b>{b}</b><small>{c}</small></div><button>Install</button></div>)}</section></div>; }
-function FlashModal({onClose}:{onClose:()=>void}) { return <div className="modal-back"><section className="modal flash-modal"><button className="modal-close" onClick={onClose}>×</button><span className="eyebrow">WIRELESS FLASHING</span><h2>Bluetooth OTA flash</h2><p>Send a compiled update to a nearby ESP32 over Bluetooth Low Energy.</p><div className="flash-step done"><b>1</b><div><strong>Connect by USB once</strong><small>Install the AsV BLE OTA receiver on the board.</small></div></div><div className="flash-step"><b>2</b><div><strong>Pair your ESP32</strong><small>Choose it from nearby secure BLE devices.</small></div><button>Scan nearby</button></div><div className="flash-step"><b>3</b><div><strong>Flash future updates wirelessly</strong><small>Signed update packages protect the board.</small></div></div><small className="security-note">Bluetooth flashing is for your own trusted devices. Keep OTA authentication enabled and never expose the receiver without a password or signed firmware.</small><button className="primary" onClick={onClose}>Set up Bluetooth flashing</button></section></div>; }
+function FlashModal({onClose,onPair}:{onClose:()=>void;onPair:()=>Promise<void>}) { return <div className="modal-back"><section className="modal flash-modal"><button className="modal-close" onClick={onClose}>×</button><span className="eyebrow">WIRELESS FLASHING</span><h2>Bluetooth OTA flash</h2><p>Send a compiled update to a nearby ESP32 over Bluetooth Low Energy.</p><div className="flash-step done"><b>1</b><div><strong>Connect by USB once</strong><small>Install the AsV BLE OTA receiver on the board.</small></div></div><div className="flash-step"><b>2</b><div><strong>Pair your ESP32</strong><small>Choose it from nearby secure BLE devices.</small></div><button onClick={onPair}>Scan nearby</button></div><div className="flash-step"><b>3</b><div><strong>Flash future updates wirelessly</strong><small>Signed update packages protect the board.</small></div></div><small className="security-note">Bluetooth flashing is for your own trusted devices. Keep OTA authentication enabled and never expose the receiver without a password or signed firmware.</small><button className="primary" onClick={onClose}>Set up Bluetooth flashing</button></section></div>; }
