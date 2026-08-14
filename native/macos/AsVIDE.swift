@@ -35,7 +35,7 @@ final class ExecutorBridge: NSObject, WKScriptMessageHandler {
   }
   private func publish(_ output: String) {
     let safe = String(output.prefix(20000))
-    let json = (try? JSONSerialization.data(withJSONObject: safe, options: [])) .flatMap { String(data: $0, encoding: .utf8) } ?? "\"Output unavailable\""
+    let json = (try? JSONEncoder().encode(safe)).flatMap { String(data: $0, encoding: .utf8) } ?? "\"Output unavailable\""
     DispatchQueue.main.async { self.webView?.evaluateJavaScript("window.dispatchEvent(new CustomEvent('asv-execute-output',{detail:\(json)}));") }
   }
 }
@@ -57,11 +57,15 @@ final class ServerBridge: NSObject, WKScriptMessageHandler {
     } catch { publish("Could not start server: \(error.localizedDescription)") }
   }
   func stopAll() { servers.forEach { if $0.isRunning { $0.terminate() } }; servers.removeAll() }
-  private func publish(_ output: String) { let json = (try? JSONSerialization.data(withJSONObject: output, options: [])).flatMap { String(data: $0, encoding: .utf8) } ?? "\"Output unavailable\""; webView?.evaluateJavaScript("window.dispatchEvent(new CustomEvent('asv-server-output',{detail:\(json)}));") }
+  private func publish(_ output: String) { let json = (try? JSONEncoder().encode(output)).flatMap { String(data: $0, encoding: .utf8) } ?? "\"Output unavailable\""; webView?.evaluateJavaScript("window.dispatchEvent(new CustomEvent('asv-server-output',{detail:\(json)}));") }
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
-  private var server: Process?; private let bridge = VaultBridge(); private let executor = ExecutorBridge(); private let localServer = ServerBridge()
+  private var server: Process?
+  private var mainWindow: NSWindow?
+  private let bridge = VaultBridge()
+  private let executor = ExecutorBridge()
+  private let localServer = ServerBridge()
   func applicationDidFinishLaunching(_ notification: Notification) {
     let task = Process(); task.executableURL = URL(fileURLWithPath: "/usr/bin/env"); task.arguments = ["npm", "run", "dev"]; task.currentDirectoryURL = URL(fileURLWithPath: "__PROJECT_ROOT__"); task.standardOutput = FileHandle.nullDevice; task.standardError = FileHandle.nullDevice; try? task.run(); server = task
     let content = WKUserContentController(); content.add(bridge, name: "asvVault"); content.add(executor, name: "asvExecute"); content.add(localServer, name: "asvServer")
@@ -72,8 +76,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     localServer.webView = view
     let window = NSWindow(contentRect: view.frame, styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
     window.title = "AsV_IDE"; window.center(); window.contentView = view; window.makeKeyAndOrderFront(nil)
+    mainWindow = window
+    NSApp.activate(ignoringOtherApps: true)
     DispatchQueue.main.asyncAfter(deadline: .now() + 2) { view.load(URLRequest(url: URL(string: "http://localhost:3000/")!)) }
   }
+  func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
   func applicationWillTerminate(_ notification: Notification) { server?.terminate(); localServer.stopAll() }
 }
 let app = NSApplication.shared; let delegate = AppDelegate(); app.delegate = delegate; app.setActivationPolicy(.regular); app.run()
