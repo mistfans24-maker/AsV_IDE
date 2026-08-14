@@ -18,9 +18,19 @@ void loop() {
 }`;
 
 const glyphs = "リ∆⟟꙰ꖎ⚚ᔑ╎ᓭ⍊ᒷℸ ̣ᓵᓵ∴ ̇/⍑ᒲᓭ↸!¡⚍⊣";
+const templates: Record<string, string> = {
+  "Arduino C++": sketch,
+  Python: "from machine import Pin\nfrom time import sleep\n\nled = Pin(2, Pin.OUT)\nwhile True:\n    led.toggle()\n    sleep(0.5)\n",
+  Lua: "gpio.mode(4, gpio.OUTPUT)\n\ntmr.create():alarm(500, tmr.ALARM_AUTO, function()\n  gpio.write(4, gpio.read(4) == 0 and 1 or 0)\nend)\n",
+  HTML: "<!doctype html>\n<html><body><h1>ESP32 Dashboard</h1><p>Local web interface</p></body></html>\n",
+  Ruby: "# Host-side automation script\nputs 'Watching ESP32 serial output'\n",
+};
 
 export default function Home() {
   const [booting, setBooting] = useState(true);
+  const [welcome, setWelcome] = useState(true);
+  const [projectName, setProjectName] = useState("blink-node");
+  const [language, setLanguage] = useState("Arduino C++");
   const [active, setActive] = useState("Explorer");
   const [connected, setConnected] = useState(false);
   const [deviceName, setDeviceName] = useState("No device attached");
@@ -79,11 +89,13 @@ export default function Home() {
     </main>
   );
 
+  if (welcome) return <Welcome onContinue={() => setWelcome(false)} onCreate={(name, selectedLanguage) => { setProjectName(name || "new-project"); setLanguage(selectedLanguage); setCode(templates[selectedLanguage]); setWelcome(false); }} />;
+
   return (
     <main className="ide-shell">
       <header className="topbar">
         <div className="brand"><b>A<span>V</span></b><strong>AsV_IDE</strong><em>BUILD WITHOUT LIMITS</em></div>
-        <div className="project-pill"><span className="dot" /> blink_node.ino <kbd>⌘ S</kbd></div>
+        <div className="project-pill"><span className="dot" /> {projectName} <kbd>⌘ S</kbd></div>
         <div className="top-actions">
           <button className="board-pill">{liteMode ? "Lite core · 18 MB" : "Full toolchain · 480 MB"} <span>⌄</span></button>
           <button className={connected ? "connect connected" : "connect"} onClick={connected ? () => { setConnected(false); setDeviceName("No device attached"); setDeviceNote("Connect by USB or Bluetooth"); } : connectUsb}>{connected ? "● Connected" : "Connect USB"}</button>
@@ -104,13 +116,13 @@ export default function Home() {
           <div className="side-bottom"><span>◉ ESP-IDF v5.3</span><span>◉ Arduino Core 3.0</span></div>
         </aside>
         <section className="editor-area">
-          <div className="editor-tabs"><button className="file-tab">⌘ &nbsp; blink_node.ino <span>×</span></button><button>+</button></div>
-          <div className="crumbs">AsV_IDE &nbsp;/&nbsp; projects &nbsp;/&nbsp; blink-node &nbsp;/&nbsp; <b>blink_node.ino</b></div>
+          <div className="editor-tabs"><button className="file-tab">⌘ &nbsp; {projectName} <span>×</span></button><button>+</button></div>
+          <div className="crumbs">AsV_IDE &nbsp;/&nbsp; projects &nbsp;/&nbsp; {projectName} &nbsp;/&nbsp; <b>{language}</b></div>
           <div className="editor-wrap">
             <ol className="line-numbers">{Array.from({length: 16}, (_, i) => <li key={i}>{i + 1}</li>)}</ol>
             <textarea aria-label="Code editor" spellCheck="false" value={code} onChange={e => setCode(e.target.value)} />
           </div>
-          <div className="editor-status"><span>Ln 1, Col 1</span><span>Spaces: 2</span><span>UTF-8</span><span>C++</span><span>ESP32</span></div>
+          <div className="editor-status"><span>Ln 1, Col 1</span><span>Spaces: 2</span><span>UTF-8</span><span>{language}</span><span>ESP32 / Arduino</span></div>
         </section>
         <aside className="inspector">
           <div className="inspector-head"><span>DEVICE PULSE</span><span className={connected ? "pulse online" : "pulse"}>{connected ? "ONLINE" : "WAITING"}</span></div>
@@ -131,6 +143,12 @@ export default function Home() {
 }
 
 function Explorer() { return <><div className="tree-title">▾ BLINK-NODE <button>+</button></div><div className="tree-file selected">⌘ &nbsp; blink_node.ino</div><div className="tree-file">▱ &nbsp; platformio.ini</div><div className="tree-file">▣ &nbsp; README.md</div><div className="tree-title closed">› LIBRARIES</div><div className="tree-title closed">› EXAMPLES</div></>; }
+function Welcome({onContinue, onCreate}:{onContinue:()=>void;onCreate:(name:string,language:string)=>void}) {
+  const [name, setName] = useState(""); const [language, setLanguage] = useState("Arduino C++"); const [github, setGithub] = useState(false);
+  const [repo, setRepo] = useState(""); const [token, setToken] = useState(""); const [notice, setNotice] = useState("");
+  const connectGithub = () => { const vault = (window as Window & { asvVault?: { save:(name:string,secret:string)=>void } }).asvVault; if (!repo || !token) { setNotice("Add your repository URL and GitHub token."); return; } if (!vault) { setNotice("Open the native AsV_IDE app to save GitHub access securely in Keychain."); return; } vault.save("github-repository", repo); vault.save("github-token", token); setToken(""); setNotice("GitHub connection saved locally. Auto-sync turns on when you open this project."); };
+  return <main className="welcome-screen"><div className="welcome-glow"/><div className="welcome-brand"><b>A<span>V</span></b><strong>AsV_IDE</strong><em>{glyphs.slice(0, 14)}</em></div><section className="welcome-card"><span className="eyebrow">LOCAL CREATOR STUDIO</span><h1>Welcome back.</h1><p>Build for ESP32, Arduino, the web, or your computer—one local workspace.</p><div className="welcome-actions"><button className="continue-card" onClick={onContinue}><span>↺</span><div><b>Continue project</b><small>blink-node · Arduino C++</small></div><i>→</i></button><div className="new-project"><h2>Create a new project</h2><input value={name} onChange={e=>setName(e.target.value)} placeholder="Project name"/><div className="language-grid">{Object.keys(templates).map(item=><button key={item} onClick={()=>setLanguage(item)} className={language===item?"selected":""}>{item}</button>)}</div><button className="primary" onClick={()=>onCreate(name, language)}>Create {language} project →</button></div></div><div className="github-box"><div><span>◉</span><b>GitHub Auto-sync</b><small>Optional. Save changes locally, then sync when connected.</small></div><button onClick={()=>setGithub(!github)}>{github?"Hide setup":"Connect GitHub"}</button>{github && <section className="github-form"><input value={repo} onChange={e=>setRepo(e.target.value)} placeholder="https://github.com/you/project.git"/><input type="password" value={token} onChange={e=>setToken(e.target.value)} placeholder="GitHub personal access token"/><button className="primary" onClick={connectGithub}>Save secure connection</button><small>{notice || "Your token is stored only in the macOS Keychain, never in the project."}</small></section>}</div></section><footer className="welcome-footer">LOCAL-FIRST · PLUGINS ON DEMAND · AI OPTIONAL</footer></main>;
+}
 function Plugins({onClose}:{onClose:()=>void}) { return <div className="plugin-mini"><p>Make your workflow yours.</p><div><b>✦ Gemini Assist</b><small>AI completion & review</small><button>Active</button></div><div><b>◉ Serial Studio</b><small>Visual telemetry</small><button>Active</button></div><button className="browse" onClick={onClose}>Browse plugin hub →</button></div>; }
 function Metric({label,value,width}:{label:string,value:string,width:string}) { return <div className="metric"><div><span>{label}</span><b>{value}</b></div><i><em style={{width}} /></i></div>; }
 function AiModal({onClose}:{onClose:()=>void}) {
