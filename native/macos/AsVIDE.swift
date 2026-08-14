@@ -11,6 +11,27 @@ final class VaultBridge: NSObject, WKScriptMessageHandler {
   }
 }
 
+final class MediaBridge: NSObject, WKScriptMessageHandler {
+  weak var webView: WKWebView?
+  func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+    guard message.name == "asvMedia", let payload = message.body as? [String: String], let action = payload["action"] else { return }
+    let commands = ["previous": "previous track", "playPause": "playpause", "next": "next track"]
+    guard let command = commands[action] else { return }
+    DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+      let process = Process(); let pipe = Pipe()
+      process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+      process.arguments = ["-e", "tell application \"Music\" to \(command)"]
+      process.standardOutput = pipe; process.standardError = pipe
+      do {
+        try process.run(); process.waitUntilExit()
+        let output = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        self?.publish(process.terminationStatus == 0 ? "Media command sent to Apple Music." : "Media controls need Apple Music to be available. \(output)")
+      } catch { self?.publish("Could not access Apple Music: \(error.localizedDescription)") }
+    }
+  }
+  private func publish(_ output: String) { let json = (try? JSONEncoder().encode(output)).flatMap { String(data: $0, encoding: .utf8) } ?? "\"Media control unavailable\""; DispatchQueue.main.async { self.webView?.evaluateJavaScript("window.dispatchEvent(new CustomEvent('asv-media-output',{detail:\(json)}));") } }
+}
+
 final class ExecutorBridge: NSObject, WKScriptMessageHandler {
   weak var webView: WKWebView?
   func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
