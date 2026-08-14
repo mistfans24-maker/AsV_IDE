@@ -78,13 +78,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     window.title = "AsV_IDE"; window.center(); window.contentView = view; window.makeKeyAndOrderFront(nil)
     mainWindow = window
     NSApp.activate(ignoringOtherApps: true)
+    view.loadHTMLString("<body style='margin:0;background:#08161b;color:#7cf8ea;font:13px -apple-system,system-ui;display:grid;place-items:center;height:100vh;letter-spacing:.12em'>STARTING AsV_IDE…</body>", baseURL: nil)
     loadWorkspace(in: view)
   }
   private func loadWorkspace(in view: WKWebView, attempt: Int = 0) {
-    let url = URL(string: "http://localhost:3210/")!
+    let url = URL(string: "http://127.0.0.1:3210/")!
     URLSession.shared.dataTask(with: url) { _, _, error in
       if error == nil { DispatchQueue.main.async { view.load(URLRequest(url: url)) } }
       else if attempt < 20 { DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { self.loadWorkspace(in: view, attempt: attempt + 1) } }
+      else { DispatchQueue.main.async { view.loadHTMLString("<body style='margin:0;background:#08161b;color:#d8f4f0;font:15px -apple-system,system-ui;display:grid;place-items:center;height:100vh;text-align:center'><div><b>AsV_IDE could not start its local workspace.</b><p style='color:#7fa1a5'>Close the app and open it again.</p></div></body>", baseURL: nil) } }
     }.resume()
   }
   func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
