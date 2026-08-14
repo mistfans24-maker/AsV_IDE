@@ -2,214 +2,68 @@
 
 import { useEffect, useState } from "react";
 
-const sketch = `#include <WiFi.h>
+const templates: Record<string, string> = {
+  "Arduino C++": `#include <Arduino.h>
 
 constexpr int STATUS_LED = 2;
 
 void setup() {
   Serial.begin(115200);
   pinMode(STATUS_LED, OUTPUT);
-  Serial.println("AsV node online");
 }
 
 void loop() {
   digitalWrite(STATUS_LED, !digitalRead(STATUS_LED));
   delay(500);
-}`;
-
-const glyphs = "リ∆⟟꙰ꖎ⚚ᔑ╎ᓭ⍊ᒷℸ ̣ᓵᓵ∴ ̇/⍑ᒲᓭ↸!¡⚍⊣";
-const templates: Record<string, string> = {
-  "Arduino C++": sketch,
-  Python: "from machine import Pin\nfrom time import sleep\n\nled = Pin(2, Pin.OUT)\nwhile True:\n    led.toggle()\n    sleep(0.5)\n",
-  Lua: "gpio.mode(4, gpio.OUTPUT)\n\ntmr.create():alarm(500, tmr.ALARM_AUTO, function()\n  gpio.write(4, gpio.read(4) == 0 and 1 or 0)\nend)\n",
-  HTML: "<!doctype html>\n<html><body><h1>ESP32 Dashboard</h1><p>Local web interface</p></body></html>\n",
-  Ruby: "# Host-side automation script\nputs 'Watching ESP32 serial output'\n",
-  JavaScript: "console.log('Local JavaScript tool ready');\n",
+}`,
+  Python: `print("Hello from AsV_IDE")\n\n# Start building your local project here.\n`,
+  JavaScript: `console.log("Hello from AsV_IDE");\n`,
+  HTML: `<!doctype html>\n<html><body><h1>Hello, AsV_IDE</h1></body></html>\n`,
+  Lua: `print("Hello from AsV_IDE")\n`, Ruby: `puts "Hello from AsV_IDE"\n`,
 };
+const themes = ["aurora", "midnight", "neon", "sunset"];
+const glyphs = "リ∆⟟꙰ꖎ⚚ᔑ╎ᓭ⍊ᒷℸ ̣ᓵᓵ∴";
+const welcomeText: Record<string, { label: string; title: string; description: string }> = {
+  English: { label: "LOCAL CREATOR STUDIO", title: "Welcome back.", description: "Build for ESP32, Arduino, the web, or your computer—one local workspace." },
+  Arabic: { label: "استوديو الإبداع المحلي", title: "مرحباً بعودتك.", description: "أنشئ لمتحكم ESP32 وأردوينو والويب وجهازك في مساحة محلية واحدة." },
+  Hindi: { label: "लोकल क्रिएटर स्टूडियो", title: "वापस आने पर स्वागत है।", description: "ESP32, Arduino, वेब या अपने कंप्यूटर के लिए एक स्थानीय कार्यक्षेत्र में बनाएं।" },
+  Spanish: { label: "ESTUDIO CREADOR LOCAL", title: "Bienvenido de nuevo.", description: "Crea para ESP32, Arduino, la web o tu ordenador desde un espacio local." },
+  French: { label: "ATELIER CRÉATEUR LOCAL", title: "Bon retour.", description: "Créez pour ESP32, Arduino, le web ou votre ordinateur dans un espace local." },
+};
+type Project = { name: string; language: string; code: string };
 
 export default function Home() {
-  const [booting, setBooting] = useState(true);
-  const [welcome, setWelcome] = useState(true);
-  const [projectName, setProjectName] = useState("blink-node");
-  const [language, setLanguage] = useState("Arduino C++");
-  const [background, setBackground] = useState("aurora");
-  const [notebook, setNotebook] = useState(false);
-  const [active, setActive] = useState("Explorer");
-  const [connected, setConnected] = useState(false);
-  const [deviceName, setDeviceName] = useState("No device attached");
-  const [deviceNote, setDeviceNote] = useState("Connect by USB or Bluetooth");
-  const [terminalNote, setTerminalNote] = useState("Connect a board to begin live serial output.");
-  const [aiOpen, setAiOpen] = useState(false);
-  const [pluginOpen, setPluginOpen] = useState(false);
-  const [flashOpen, setFlashOpen] = useState(false);
-  const [liteMode, setLiteMode] = useState(true);
-  const [runOpen, setRunOpen] = useState(false);
-  const [visualOpen, setVisualOpen] = useState(false);
-  const [runOutput, setRunOutput] = useState("Ready to run locally.");
-  const [glyphLine, setGlyphLine] = useState("");
-  const [code, setCode] = useState(sketch);
-  const [workspaceLoaded, setWorkspaceLoaded] = useState(false);
-
-  useEffect(() => {
-    const makeGlyphs = () => setGlyphLine(Array.from({ length: 24 }, () => glyphs[Math.floor(Math.random() * glyphs.length)]).join(""));
-    makeGlyphs();
-    const characterTimer = window.setInterval(makeGlyphs, 100);
-    const bootTimer = window.setTimeout(() => setBooting(false), 600);
-    return () => { window.clearInterval(characterTimer); window.clearTimeout(bootTimer); };
-  }, []);
-
-  useEffect(() => {
-    const receiveOutput = (event: Event) => setRunOutput((event as CustomEvent<string>).detail);
-    window.addEventListener("asv-execute-output", receiveOutput);
-    return () => window.removeEventListener("asv-execute-output", receiveOutput);
-  }, []);
-
-  useEffect(() => {
-    if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => undefined);
-  }, []);
-
-  useEffect(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem("asv-ide-workspace") || "null");
-      if (saved) { setProjectName(saved.projectName || "blink-node"); setLanguage(saved.language || "Arduino C++"); setCode(saved.code || sketch); }
-    } catch { /* Start with a clean local workspace if saved data is invalid. */ }
-    setWorkspaceLoaded(true);
-  }, []);
-
-  useEffect(() => {
-    if (!workspaceLoaded) return;
-    localStorage.setItem("asv-ide-workspace", JSON.stringify({ projectName, language, code }));
-  }, [workspaceLoaded, projectName, language, code]);
-
-  async function connectUsb() {
-    const localBrowser = navigator as Navigator & { serial?: { requestPort: () => Promise<{ open: (options: { baudRate: number }) => Promise<void> }> } };
-    if (!localBrowser.serial) {
-      setTerminalNote("This browser does not support USB serial. Open AsV_IDE in Chrome or Edge on this computer.");
-      return;
-    }
-    try {
-      const port = await localBrowser.serial.requestPort();
-      await port.open({ baudRate: 115200 });
-      setConnected(true); setDeviceName("ESP32 USB serial"); setDeviceNote("USB · 115200 baud");
-      setTerminalNote("USB serial connected locally. Your board is ready for a local build and flash.");
-    } catch { setTerminalNote("USB connection was cancelled or the serial port could not be opened."); }
-  }
-
-  async function pairBluetooth() {
-    const localBrowser = navigator as Navigator & { bluetooth?: { requestDevice: (options: { acceptAllDevices: boolean }) => Promise<{ name?: string }> } };
-    if (!localBrowser.bluetooth) { setTerminalNote("Bluetooth pairing needs Chrome or Edge on this computer."); return; }
-    try {
-      const device = await localBrowser.bluetooth.requestDevice({ acceptAllDevices: true });
-      setConnected(true); setDeviceName(device.name || "ESP32 BLE device"); setDeviceNote("Bluetooth LE paired locally");
-      setTerminalNote("Bluetooth device paired. Install the OTA receiver by USB before sending wireless updates.");
-    } catch { setTerminalNote("Bluetooth pairing was cancelled."); }
-  }
-
-  if (booting) return (
-    <main className="boot-screen">
-      <img className="boot-logo" src="/asv-logo.png" alt="AsV_IDE" />
-      <div className="glyph-line">{glyphLine}</div>
-      <div className="boot-loader"><i /></div>
-      <p>INITIALIZING ESP WORKSPACE</p>
-    </main>
-  );
-
-  if (welcome) return <Welcome background={background} setBackground={setBackground} onContinue={(name, selectedLanguage) => { setProjectName(name); setLanguage(selectedLanguage); setCode(templates[selectedLanguage]); setWelcome(false); }} onCreate={(name, selectedLanguage) => { setProjectName(name || "new-project"); setLanguage(selectedLanguage); setCode(templates[selectedLanguage]); setWelcome(false); }} />;
-  if (notebook) return <NotebookPage background={background} onBack={() => setNotebook(false)} />;
-
-  return (
-    <main className={`ide-shell theme-${background}`}>
-      <header className="topbar">
-        <div className="brand"><img src="/asv-logo.png" alt="AsV_IDE" /><em>BUILD WITHOUT LIMITS</em></div>
-        <div className="project-pill"><span className="dot" /> {projectName} <kbd>⌘ S</kbd></div>
-        <div className="top-actions">
-          <button className="board-pill">{liteMode ? "Lite core · 18 MB" : "Full toolchain · 480 MB"} <span>⌄</span></button>
-          <button className="visual-button" onClick={() => setVisualOpen(true)}>◌ Canvas</button>
-          <button className="visual-button" onClick={() => setNotebook(true)}>▤ Notebook</button>
-          <button className="run-button" onClick={() => setRunOpen(true)}>▶ Run</button>
-          <button className={connected ? "connect connected" : "connect"} onClick={connected ? () => { setConnected(false); setDeviceName("No device attached"); setDeviceNote("Connect by USB or Bluetooth"); } : connectUsb}>{connected ? "● Connected" : "Connect USB"}</button>
-          <button className="avatar">AR</button>
-        </div>
-      </header>
-
-      <section className="workspace">
-        <aside className="activity-bar">
-          {[
-            ["⌘", "Explorer"], ["⌕", "Search"], ["⑂", "Source"], ["▣", "Extensions"], ["◈", "Device"],
-          ].map(([icon, label]) => <button key={label} title={label} onClick={() => setActive(label)} className={active === label ? "active" : ""}>{icon}</button>)}
-          <button className="settings" title="Settings">⚙</button>
-        </aside>
-        <aside className="side-panel">
-          <div className="panel-heading">{active.toUpperCase()} <button>•••</button></div>
-          {active === "Extensions" ? <Plugins onClose={() => setPluginOpen(true)} /> : <Explorer />}
-          <div className="side-bottom"><span>◉ ESP-IDF v5.3</span><span>◉ Arduino Core 3.0</span></div>
-        </aside>
-        <section className="editor-area">
-          <div className="editor-tabs"><button className="file-tab">⌘ &nbsp; {projectName} <span>×</span></button><button>+</button></div>
-          <div className="crumbs">AsV_IDE &nbsp;/&nbsp; projects &nbsp;/&nbsp; {projectName} &nbsp;/&nbsp; <b>{language}</b></div>
-          <div className="editor-wrap">
-            <ol className="line-numbers">{Array.from({length: 16}, (_, i) => <li key={i}>{i + 1}</li>)}</ol>
-            <CodeEditor value={code} language={language} onChange={setCode} />
-          </div>
-          <div className="editor-status"><span>Ln 1, Col 1</span><span>Spaces: 2</span><span>UTF-8</span><span>{language}</span><span>ESP32 / Arduino</span></div>
-        </section>
-        <aside className="inspector">
-          <div className="inspector-head"><span>DEVICE PULSE</span><span className={connected ? "pulse online" : "pulse"}>{connected ? "ONLINE" : "WAITING"}</span></div>
-          <div className="device-card"><div className="chip-art">ESP<br/><b>32</b></div><h3>{connected ? deviceName : "No device attached"}</h3><p>{connected ? deviceNote : "Connect by USB or Bluetooth"}</p><button onClick={connected ? () => setConnected(false) : connectUsb}>{connected ? "Disconnect" : "Connect USB"}</button><button className="ble-flash" onClick={() => setFlashOpen(true)}>⌁ Bluetooth flash</button></div>
-          <div className="metrics"><Metric label="FLASH" value="1.2 / 4 MB" width="30%" /><Metric label="HEAP" value="281 KB" width="68%" /><Metric label="CPU" value="240 MHz" width="88%" /></div>
-          <button className="ai-card" onClick={() => setAiOpen(true)}><span>✦</span><div><b>AsV Intelligence</b><small>Ask, fix, optimize code</small></div><i>→</i></button>
-          <button className={liteMode ? "lite-switch enabled" : "lite-switch"} onClick={() => setLiteMode(!liteMode)}><span>◌</span><div><b>Featherweight mode</b><small>{liteMode ? "Core + active plugins only" : "All offline tools installed"}</small></div><i>{liteMode ? "ON" : "OFF"}</i></button>
-        </aside>
-      </section>
-      <section className="terminal"><div className="terminal-bar"><div><b>TERMINAL</b><span>OUTPUT</span><span>PROBLEMS <i>0</i></span><span>SERIAL MONITOR</span></div><button>⌄</button></div><div className="terminal-body"><p><b>›</b> Ready to compile <span>blink-node</span> for ESP32 DevKit V1</p><p><b>›</b> Local plugin host initialized — 12 extensions available</p><p className="muted">{terminalNote}</p></div></section>
-      <footer><div><span className="sync">↻</span> main* &nbsp; <span>◉</span> 0 errors &nbsp; 0 warnings</div><div>ESP32 &nbsp; | &nbsp; UTF-8 &nbsp; | &nbsp; Turbo build engine <b>⚡</b></div></footer>
-      <button className="fab" onClick={() => setPluginOpen(true)}>✦ <span>Plugin hub</span></button>
-      {aiOpen && <AiModal onClose={() => setAiOpen(false)} />}
-      {pluginOpen && <PluginModal onClose={() => setPluginOpen(false)} />}
-      {flashOpen && <FlashModal onClose={() => setFlashOpen(false)} onPair={pairBluetooth} />}
-      {visualOpen && <VisualModal value={background} onChoose={setBackground} onClose={() => setVisualOpen(false)} />}
-      {runOpen && <RunPanel code={code} language={language} output={runOutput} setOutput={setRunOutput} onClose={() => setRunOpen(false)} />}
-    </main>
-  );
+  const [booting, setBooting] = useState(true); const [welcome, setWelcome] = useState(true);
+  const [project, setProject] = useState<Project>({ name: "blink-node", language: "Arduino C++", code: templates["Arduino C++"] });
+  const [theme, setTheme] = useState("aurora"); const [active, setActive] = useState("Explorer"); const [file, setFile] = useState<"README" | "Code">("README");
+  const [settingsOpen, setSettingsOpen] = useState(false); const [loginOpen, setLoginOpen] = useState(false); const [adminMode, setAdminMode] = useState(false); const [displayName, setDisplayName] = useState(""); const [notebook, setNotebook] = useState(false); const [terminal, setTerminal] = useState("Ready to work locally."); const [about, setAbout] = useState("AsV_IDE is built by makers who believe great tools should stay local, fast, and yours."); const [hiring, setHiring] = useState("Join our Discord — we are hiring developers, hardware builders, and plugin creators."); const [loaded, setLoaded] = useState(false);
+  useEffect(() => { const timer = window.setTimeout(() => setBooting(false), 600); try { const saved = JSON.parse(localStorage.getItem("asv-ide-workspace") || "null"); if (saved?.project) setProject(saved.project); if (saved?.theme) setTheme(saved.theme); if(saved?.about)setAbout(saved.about);if(saved?.hiring)setHiring(saved.hiring);if(saved?.adminMode)setAdminMode(true);if(saved?.displayName)setDisplayName(saved.displayName); } catch {} setLoaded(true); return () => window.clearTimeout(timer); }, []);
+  useEffect(() => { if (loaded) localStorage.setItem("asv-ide-workspace", JSON.stringify({ project, theme, about, hiring, adminMode, displayName })); }, [loaded, project, theme, about, hiring, adminMode, displayName]);
+  useEffect(() => { const receive = (event: Event) => setTerminal((event as CustomEvent<string>).detail); window.addEventListener("asv-execute-output", receive); return () => window.removeEventListener("asv-execute-output", receive); }, []);
+  const createProject = (name: string, language: string) => { const cleanName = name.trim() || "new-project"; setProject({ name: cleanName, language, code: templates[language] }); setFile("README"); setWelcome(false); setTerminal(`Created ${cleanName} locally.`); };
+  const run = () => { if (project.language === "HTML") { setTerminal("HTML preview is ready in the browser."); return; } const runner = (window as Window & { asvExecutor?: { run: (language: string, code: string) => void } }).asvExecutor; if (!runner) { setTerminal("Open the macOS AsV_IDE app to run local code."); return; } if (!["Python", "JavaScript", "Lua", "Ruby"].includes(project.language)) { setTerminal("Arduino needs its board toolchain and a connected board to compile/upload."); return; } setTerminal(`Running ${project.language} locally…`); runner.run(project.language, project.code); };
+  if (booting) return <main className="boot-screen"><div className="boot-mark">A<span>V</span></div><div className="boot-name">AsV_IDE</div><div className="glyph-line">{glyphs}</div><div className="boot-loader"><i /></div><p>INITIALIZING LOCAL WORKSPACE</p></main>;
+  if (welcome) return <Welcome theme={theme} setTheme={setTheme} onCreate={createProject} displayName={displayName} />;
+  if (notebook) return <Notebook theme={theme} onBack={() => setNotebook(false)} />;
+  const nav = [["⌘", "Explorer"], ["⌕", "Search"], ["⑂", "Source Control"], ["▣", "Extensions"], ["◈", "Device"], ["ⓘ", "About Us"], ...(adminMode ? [["♛", "Admin"]] : [])];
+  return <main className={`ide-shell theme-${theme}`}>
+    <header className="topbar"><div className="brand"><b>A<span>V</span></b><strong>AsV_IDE</strong><em>{adminMode ? "ADMIN EDITION" : "LOCAL WORKSPACE"}</em></div><div className="project-pill"><span className="dot" />{project.name}</div><div className="top-actions"><button className="visual-button" onClick={() => setLoginOpen(true)}>{displayName ? `Hi, ${displayName}` : "Sign in"}</button><button className="visual-button" onClick={() => setNotebook(true)}>▤ Notebook</button><button className="run-button" onClick={run}>▶ Run</button><button className="avatar" onClick={() => setSettingsOpen(true)} title="Open settings">⚙</button></div></header>
+    <section className="workspace"><aside className="activity-bar">{nav.map(([icon, label]) => <button key={label} onClick={() => setActive(label)} className={active === label ? "active" : ""} title={label}>{icon}</button>)}<button className="settings" onClick={() => setSettingsOpen(true)} title="Settings">⚙</button></aside><aside className="side-panel"><div className="panel-heading">{active.toUpperCase()}</div><Sidebar active={active} project={project} openReadme={() => setFile("README")} openCode={() => setFile("Code")} about={about} hiring={hiring} adminMode={adminMode}/><div className="side-bottom"><span>◉ Local-first</span><span>◉ Autosaved</span></div></aside><section className="editor-area">{active === "Admin" ? <AdminPanel about={about} setAbout={setAbout} hiring={hiring} setHiring={setHiring} /> : <><div className="editor-tabs"><button className={file === "README" ? "file-tab" : ""} onClick={() => setFile("README")}>▣ README.md</button><button className={file === "Code" ? "file-tab" : ""} onClick={() => setFile("Code")}>⌘ {project.name}</button></div><div className="crumbs">AsV_IDE / projects / {project.name} / <b>{file === "README" ? "README.md" : project.language}</b></div>{file === "README" ? <Readme project={project} openCode={() => setFile("Code")} /> : <Editor project={project} setProject={setProject} />}</>}</section><aside className="inspector"><div className="inspector-head"><span>DEVICE PULSE</span><span className="pulse">WAITING</span></div><div className="device-card"><div className="chip-art">ESP<br/><b>32</b></div><h3>No device attached</h3><p>Connect USB or Bluetooth when ready.</p><button onClick={() => setTerminal("Use Connect USB in the native app to choose a board.")}>Connect device</button></div><button className="ai-card" onClick={() => setSettingsOpen(true)}><span>✦</span><div><b>AsV Intelligence</b><small>Configure AI providers</small></div><i>→</i></button></aside></section>
+    <section className="community-banner">◈ {hiring}</section><section className="terminal"><div className="terminal-bar"><div><b>TERMINAL</b><span>OUTPUT</span><span>PROBLEMS <i>0</i></span></div><button onClick={() => setTerminal("Console cleared.")}>Clear</button></div><div className="terminal-body"><p><b>›</b> {terminal}</p></div></section><footer><div><span>↻</span> Saved locally</div><div>{project.language} · UTF-8 · AsV_IDE</div></footer>{settingsOpen && <Settings theme={theme} setTheme={setTheme} onClose={() => setSettingsOpen(false)} />}{loginOpen && <Login onClose={() => setLoginOpen(false)} onAdmin={(name) => { setAdminMode(true); setDisplayName(name); setActive("Admin"); setLoginOpen(false); setTerminal(`Welcome ${name} — edit your workspace panels below.`); }}/>} 
+  </main>;
 }
 
-function Explorer() { return <><div className="tree-title">▾ BLINK-NODE <button>+</button></div><div className="tree-file selected">⌘ &nbsp; blink_node.ino</div><div className="tree-file">▱ &nbsp; platformio.ini</div><div className="tree-file">▣ &nbsp; README.md</div><div className="tree-title closed">› LIBRARIES</div><div className="tree-title closed">› EXAMPLES</div></>; }
-function Welcome({onContinue, onCreate, background, setBackground}:{onContinue:(name:string,language:string)=>void;onCreate:(name:string,language:string)=>void;background:string;setBackground:(value:string)=>void}) {
-  const [name, setName] = useState(""); const [language, setLanguage] = useState("Arduino C++"); const [github, setGithub] = useState(false);
-  const [repo, setRepo] = useState(""); const [token, setToken] = useState(""); const [notice, setNotice] = useState("");
-  const [projectBrowser, setProjectBrowser] = useState(false); const [query, setQuery] = useState("");
-  const projects = [["blink-node","Arduino C++","Today"],["weather-station","Python","Yesterday"],["room-dashboard","HTML","Aug 11"],["serial-automator","Ruby","Aug 09"],["node-light","Lua","Aug 06"]];
-  const connectGithub = () => { const vault = (window as Window & { asvVault?: { save:(name:string,secret:string)=>void } }).asvVault; if (!repo || !token) { setNotice("Add your repository URL and GitHub token."); return; } if (!vault) { setNotice("Open the native AsV_IDE app to save GitHub access securely in Keychain."); return; } vault.save("github-repository", repo); vault.save("github-token", token); setToken(""); setNotice("GitHub connection saved locally. Auto-sync turns on when you open this project."); };
-  if(projectBrowser) return <main className={`welcome-screen theme-${background}`}><div className="welcome-glow"/><div className="welcome-brand"><img src="/asv-logo.png" alt="AsV_IDE"/><em>PROJECT LIBRARY</em></div><section className="welcome-card project-browser"><button className="back-projects" onClick={()=>setProjectBrowser(false)}>← Welcome</button><span className="eyebrow">YOUR LOCAL PROJECTS</span><h1>Choose a project.</h1><p>Search, open, or continue working exactly where you left off.</p><input className="project-search" value={query} onChange={e=>setQuery(e.target.value)} placeholder="⌕ Search projects"/>{projects.filter(project=>project[0].includes(query.toLowerCase())||project[1].toLowerCase().includes(query.toLowerCase())).map(([project,projectLanguage,updated])=><button key={project} className="project-row" onClick={()=>onContinue(project,projectLanguage)}><span>⌘</span><div><b>{project}</b><small>{projectLanguage} · Updated {updated}</small></div><i>Open →</i></button>)}</section></main>;
-  return <main className={`welcome-screen theme-${background}`}><div className="welcome-glow"/><div className="welcome-brand"><img src="/asv-logo.png" alt="AsV_IDE"/><em>{glyphs.slice(0, 14)}</em></div><section className="welcome-card"><span className="eyebrow">LOCAL CREATOR STUDIO</span><h1>Welcome back.</h1><p>Build for ESP32, Arduino, the web, or your computer—one local workspace.</p><div className="theme-picker"><span>BACKGROUND</span>{["aurora","midnight","neon","sunset"].map(item=><button key={item} onClick={()=>setBackground(item)} className={background===item?`selected ${item}`:item}>{item}</button>)}</div><div className="welcome-actions"><button className="continue-card" onClick={()=>setProjectBrowser(true)}><span>↺</span><div><b>Continue project</b><small>Search all local projects</small></div><i>→</i></button><div className="new-project"><h2>Create a new project</h2><input value={name} onChange={e=>setName(e.target.value)} placeholder="Project name"/><div className="language-grid">{Object.keys(templates).map(item=><button key={item} onClick={()=>setLanguage(item)} className={language===item?"selected":""}>{item}</button>)}</div><button className="primary" onClick={()=>onCreate(name, language)}>Create {language} project →</button></div></div><div className="github-box"><div><span>◉</span><b>GitHub Auto-sync</b><small>Optional. Save changes locally, then sync when connected.</small></div><button onClick={()=>setGithub(!github)}>{github?"Hide setup":"Connect GitHub"}</button>{github && <section className="github-form"><input value={repo} onChange={e=>setRepo(e.target.value)} placeholder="https://github.com/you/project.git"/><input type="password" value={token} onChange={e=>setToken(e.target.value)} placeholder="GitHub personal access token"/><button className="primary" onClick={connectGithub}>Save secure connection</button><small>{notice || "Your token is stored only in the macOS Keychain, never in the project."}</small></section>}</div></section><footer className="welcome-footer">LOCAL-FIRST · PLUGINS ON DEMAND · AI OPTIONAL</footer></main>;
+function Welcome({ theme, setTheme, onCreate, displayName }: { theme: string; setTheme: (theme: string) => void; onCreate: (name: string, language: string) => void; displayName: string }) {
+  const [name, setName] = useState(""); const [language, setLanguage] = useState("Arduino C++"); const [languageName, setLanguageName] = useState("English");
+  const copy = welcomeText[languageName];
+  const title = displayName ? `${copy.title.replace(".", "")}, ${displayName}.` : copy.title;
+  return <main className={`welcome-screen theme-${theme}`}><div className="welcome-glow"/><div className="welcome-brand"><strong>AsV_IDE</strong></div><section className="welcome-card"><span className="eyebrow">{copy.label}</span><h1>{title}</h1><p>{copy.description}</p><div className="language-picker"><span>LANGUAGE</span>{Object.keys(welcomeText).map(item => <button key={item} onClick={() => setLanguageName(item)} className={languageName === item ? "selected" : ""}>{item}</button>)}</div><div className="theme-picker"><span>BACKGROUND</span>{themes.map(item => <button key={item} onClick={() => setTheme(item)} className={theme === item ? "selected" : ""}>{item}</button>)}</div><div className="new-project welcome-create"><h2>Create a new project</h2><input value={name} onChange={event => setName(event.target.value)} placeholder="Project name"/><div className="language-grid">{Object.keys(templates).map(item => <button key={item} onClick={() => setLanguage(item)} className={language === item ? "selected" : ""}>{item}</button>)}</div><button className="primary" onClick={() => onCreate(name, language)}>Create {language} project →</button></div></section><footer className="welcome-footer">LOCAL-FIRST · AUTOSAVE ON · AI OPTIONAL</footer></main>;
 }
-function VisualModal({value,onChoose,onClose}:{value:string;onChoose:(theme:string)=>void;onClose:()=>void}) { return <div className="modal-back"><section className="modal"><button className="modal-close" onClick={onClose}>×</button><span className="eyebrow">VISUAL ATMOSPHERE</span><h2>Make it yours.</h2><p>Choose a live background for the whole workspace.</p><div className="visual-grid">{["aurora","midnight","neon","sunset"].map(theme=><button key={theme} onClick={()=>onChoose(theme)} className={`visual-swatch ${theme} ${value===theme?"selected":""}`}><i/><b>{theme}</b></button>)}</div></section></div>; }
-function RunPanel({code,language,output,setOutput,onClose}:{code:string;language:string;output:string;setOutput:(text:string)=>void;onClose:()=>void}) { const run=()=>{ if(language==="HTML") { setOutput("HTML preview refreshed below."); return; } const runner=(window as Window & {asvExecutor?:{run:(language:string,code:string)=>void}}).asvExecutor; if(!runner){setOutput("Open the native AsV_IDE app to run local Python, Ruby, Lua, or JavaScript.");return;} if(!["Python","Ruby","Lua","JavaScript"].includes(language)){setOutput("Arduino C++ needs the installed board toolchain and a connected board to compile/upload.");return;} setOutput(`Running ${language} locally…`);runner.run(language,code);}; return <div className="modal-back"><section className="modal run-panel"><button className="modal-close" onClick={onClose}>×</button><span className="eyebrow">LOCAL EXECUTION</span><h2>Run {language}</h2><p>Nothing is sent to a cloud service.</p><button className="primary" onClick={run}>▶ Execute code</button>{language==="HTML"?<iframe title="HTML preview" sandbox="allow-scripts" srcDoc={code}/>:<pre className="run-output">{output}</pre>}</section></div>; }
-function NotebookPage({background,onBack}:{background:string;onBack:()=>void}) {
-  const starter = "print('Hello, AsV!')\n\n# Write a visual or local project here\nmessage = 'Build without limits'\nprint(message)\n";
-  const [code,setCode]=useState(starter); const [language,setLanguage]=useState("Python"); const [output,setOutput]=useState("Ready — click Run to execute locally."); const [port,setPort]=useState("8000"); const [url,setUrl]=useState(""); const [view,setView]=useState("code"); const [loaded,setLoaded]=useState(false);
-  useEffect(()=>{try{const saved=JSON.parse(localStorage.getItem("asv-notebook")||"null");if(saved){setCode(saved.code||starter);setLanguage(saved.language||"Python");setOutput(saved.output||"Ready — click Run to execute locally.");setPort(saved.port||"8000");setView(saved.view||"code");}}catch{}setLoaded(true);},[]);
-  useEffect(()=>{if(loaded)localStorage.setItem("asv-notebook",JSON.stringify({code,language,output,port,view}));},[loaded,code,language,output,port,view]);
-  useEffect(()=>{const receive=(event:Event)=>{const result=(event as CustomEvent<string>).detail;setOutput(result);if(result.startsWith("http"))setUrl(result);};window.addEventListener("asv-server-output",receive);return()=>window.removeEventListener("asv-server-output",receive);},[]);
-  const run=()=>{const bridge=(window as Window & {asvExecutor?:{run:(language:string,code:string)=>void}}).asvExecutor;if(!bridge){setOutput("Open the native AsV_IDE app to run this local cell.");return;}setOutput(`Running ${language} cell…`);bridge.run(language,code);};
-  const start=()=>{const bridge=(window as Window & {asvServer?:{start:(language:string,code:string,port:string)=>void}}).asvServer;if(!bridge){setOutput("Open the native AsV_IDE app to start a localhost server.");return;}setOutput(`Starting localhost:${port}…`);bridge.start(language,code,port);};
-  return <main className="visual-coder"><header className="visual-topbar"><div className="brand"><img src="/asv-logo.png" alt="AsV_IDE"/></div><div className="board-tab"><b>Untitled project</b><span>×</span></div><button className="new-tab">＋</button><div className="top-spacer"/><button className="share-button">♧ Collaborate</button><button className="icon-button">▦</button><button className="icon-button">⌘</button><button className="visual-button" onClick={onBack}>← IDE</button></header><div className="mode-strip"><button className={view==="code"?"active":""} onClick={()=>setView("code")}>⌘ Code</button><button className={view==="visual"?"active":""} onClick={()=>setView("visual")}>✦ Visual</button><span>Local workspace · autosaved</span></div><section className="canvas-board"><article className="floating-card code-card"><div className="card-title"><span>⌘ CODE CELL</span><input value="hello_asv.py" aria-label="File name" readOnly/><select value={language} onChange={e=>setLanguage(e.target.value)}><option>Python</option><option>JavaScript</option><option>Ruby</option><option>Lua</option></select><button className="play-cell" onClick={run}>▶ Run</button></div><CodeEditor value={code} language={language} onChange={setCode}/></article>{view==="visual"&&<article className="visual-card"><span>LIVE VISUAL</span><h2>{output.includes("Ready")?"Your output will appear here":"Execution result"}</h2><p>{output}</p></article>}<article className="floating-card terminal-card"><div className="card-title"><span>▣ OUTPUT / CONSOLE</span><button onClick={()=>setOutput("Console cleared.")}>Clear</button></div><pre>{output}</pre></article><article className="host-card"><span>◉ LOCALHOST</span><input value={port} onChange={e=>setPort(e.target.value.replace(/[^0-9]/g,""))} aria-label="Local port"/><button onClick={start}>Start server</button>{url&&<a href={url} target="_blank" rel="noreferrer">Open {url} ↗</a>}</article></section><nav className="floating-tools"><button>⌑</button><button className="selected">✎</button><button>✦</button><button>╱</button><button>→</button><button>⌖</button><button>▣</button><button>⌘</button><button>↶</button><button>↷</button></nav></main>;
-}
-function Plugins({onClose}:{onClose:()=>void}) { return <div className="plugin-mini"><p>Make your workflow yours.</p><div><b>✦ Gemini Assist</b><small>AI completion & review</small><button>Active</button></div><div><b>◉ Serial Studio</b><small>Visual telemetry</small><button>Active</button></div><button className="browse" onClick={onClose}>Browse plugin hub →</button></div>; }
-function Metric({label,value,width}:{label:string,value:string,width:string}) { return <div className="metric"><div><span>{label}</span><b>{value}</b></div><i><em style={{width}} /></i></div>; }
-function CodeEditor({value,language,onChange}:{value:string;language:string;onChange:(value:string)=>void}) { const lines=value.split("\n"); return <div className="color-editor"><pre aria-hidden="true">{lines.map((line,index)=><span key={index}>{highlightLine(line,language)}{index < lines.length-1 ? "\n" : ""}</span>)}</pre><textarea aria-label={`${language} code editor`} spellCheck="false" value={value} onChange={e=>onChange(e.target.value)} /></div>; }
-function highlightLine(line:string, language:string) { const words = language === "Python" ? "def|class|import|from|for|while|in|True|False|None|print|return" : language === "HTML" ? "html|head|body|div|script|style|h1|p" : language === "Lua" ? "local|function|end|if|then|while|do|return" : language === "Ruby" ? "def|class|end|do|puts|require" : "include|constexpr|int|void|const|return|if|else|while|Serial|digitalWrite|pinMode"; const parts=line.split(new RegExp(`(\/\/.*|#.*|<!--.*-->|\"(?:[^\"\\\\]|\\\\.)*\"|'(?:[^'\\\\]|\\\\.)*'|\\b(?:${words})\\b|\\b\\d+\\b)`,"g")); return parts.map((part,index)=>{const type=/^(\/\/|#|<!--)/.test(part)?"comment":/^(\"|')/.test(part)?"string":/^\d+$/.test(part)?"number":new RegExp(`^(?:${words})$`).test(part)?"keyword":"plain";return <span className={`token ${type}`} key={index}>{part}</span>;}); }
-function AiModal({onClose}:{onClose:()=>void}) {
-  const [provider, setProvider] = useState("OpenAI");
-  const [key, setKey] = useState("");
-  const [message, setMessage] = useState("Keys are stored in the macOS Keychain when you use the native AsV_IDE app.");
-  const saveKey = () => {
-    const vault = (window as Window & { asvVault?: { save: (name: string, secret: string) => void } }).asvVault;
-    if (!key.trim()) { setMessage("Paste a key first."); return; }
-    if (!vault) { setMessage("Open this in the AsV_IDE macOS app to save keys securely in Keychain."); return; }
-    vault.save(provider, key); setKey(""); setMessage(`${provider} key saved in your macOS Keychain.`);
-  };
-  return <div className="modal-back"><section className="modal ai-modal"><button className="modal-close" onClick={onClose}>×</button><div className="modal-icon">✦</div><h2>AI Vault</h2><p>Choose your coding assistant. All providers are optional.</p><div className="provider-tabs">{["OpenAI","Gemini","Claude","Ollama","Custom"].map(name => <button key={name} onClick={() => setProvider(name)} className={provider === name ? "selected" : ""}>{name}</button>)}</div><label>{provider.toUpperCase()} {provider === "Ollama" ? "LOCAL URL" : "API KEY"}<input type={provider === "Ollama" ? "url" : "password"} value={key} onChange={e => setKey(e.target.value)} placeholder={provider === "Ollama" ? "http://localhost:11434" : `Paste ${provider} API key`} /></label><small>{message}</small><button className="primary" onClick={saveKey}>Save to local vault</button></section></div>;
-}
-function PluginModal({onClose}:{onClose:()=>void}) { return <div className="modal-back"><section className="modal plugin-modal"><button className="modal-close" onClick={onClose}>×</button><span className="eyebrow">EXTENSION MARKETPLACE</span><h2>Build your perfect setup.</h2><p>Extend AsV_IDE with tools for hardware, automation, and AI.</p>{[["✦","Gemini Assist","Inline code completion and refactoring"],["◉","Serial Studio","Charts and inspectable live telemetry"],["◫","Home Assistant","Device discovery and YAML helpers"]].map(([a,b,c])=><div className="market-item" key={b}><span>{a}</span><div><b>{b}</b><small>{c}</small></div><button>Install</button></div>)}</section></div>; }
-function FlashModal({onClose,onPair}:{onClose:()=>void;onPair:()=>Promise<void>}) { return <div className="modal-back"><section className="modal flash-modal"><button className="modal-close" onClick={onClose}>×</button><span className="eyebrow">WIRELESS FLASHING</span><h2>Bluetooth OTA flash</h2><p>Send a compiled update to a nearby ESP32 over Bluetooth Low Energy.</p><div className="flash-step done"><b>1</b><div><strong>Connect by USB once</strong><small>Install the AsV BLE OTA receiver on the board.</small></div></div><div className="flash-step"><b>2</b><div><strong>Pair your ESP32</strong><small>Choose it from nearby secure BLE devices.</small></div><button onClick={onPair}>Scan nearby</button></div><div className="flash-step"><b>3</b><div><strong>Flash future updates wirelessly</strong><small>Signed update packages protect the board.</small></div></div><small className="security-note">Bluetooth flashing is for your own trusted devices. Keep OTA authentication enabled and never expose the receiver without a password or signed firmware.</small><button className="primary" onClick={onClose}>Set up Bluetooth flashing</button></section></div>; }
+
+function Sidebar({ active, project, openReadme, openCode, about, hiring, adminMode }: { active: string; project: Project; openReadme: () => void; openCode: () => void; about: string; hiring: string; adminMode: boolean }) { if (active === "Explorer") return <><div className="tree-title">▾ {project.name.toUpperCase()} <button>＋</button></div><button className="tree-file" onClick={openCode}>⌘ &nbsp; {project.name}</button><button className="tree-file" onClick={openReadme}>▣ &nbsp; README.md</button><div className="tree-title closed">› LIBRARIES</div><div className="tree-title closed">› EXAMPLES</div></>; if (active === "Search") return <div className="sidebar-message"><b>Search this project</b><input placeholder="Search files"/><small>Search is ready for your project files.</small></div>; if (active === "Source Control") return <div className="sidebar-message"><b>Source Control</b><small>Changes are autosaved locally. GitHub connection is ready for OAuth setup.</small></div>; if (active === "Extensions") return <div className="sidebar-message"><b>Extensions</b><button>✦ Gemini Assist</button><button>◉ Serial Studio</button><small>Extensions can be added without changing your project.</small></div>; if (active === "About Us") return <div className="sidebar-message about-panel"><b>About AsV_IDE</b><small>{about}</small><strong>Lead developer & founder</strong><small>AsV — maker, builder, and the person turning an idea into a local-first IDE.</small><div className="discord-note">{hiring}</div></div>; if (active === "Admin" && adminMode) return <div className="sidebar-message"><b>Admin mode active</b><small>You can edit the About and hiring panels from the Admin workspace.</small></div>; return <div className="sidebar-message"><b>Device Center</b><small>Attach an ESP32 by USB or Bluetooth to flash and view serial data.</small><button>Connect a board</button></div>; }
+function Readme({ project, openCode }: { project: Project; openCode: () => void }) { return <article className="readme"><span className="eyebrow">WELCOME TO YOUR PROJECT</span><h1>Welcome to {project.name}.</h1><p>This local {project.language} project is ready to become anything you want: an ESP32 firmware build, automation tool, web dashboard, or experiment.</p><h2>Start making</h2><ol><li>Open the main code file and write your first feature.</li><li>Use <b>Run</b> to execute supported local languages, or connect an ESP32 for board work.</li><li>Keep notes here, add files in Explorer, and save everything locally.</li></ol><button className="primary readme-action" onClick={openCode}>Open {project.name} →</button></article>; }
+function Editor({ project, setProject }: { project: Project; setProject: (project: Project) => void }) { return <div className="editor-wrap"><ol className="line-numbers">{Array.from({ length: Math.max(16, project.code.split("\n").length) }, (_, index) => <li key={index}>{index + 1}</li>)}</ol><textarea aria-label="Code editor" spellCheck="false" value={project.code} onChange={event => setProject({ ...project, code: event.target.value })}/></div>; }
+function Login({ onClose, onAdmin }: { onClose: () => void; onAdmin: (name: string) => void }) { const [username, setUsername] = useState(""); const [password, setPassword] = useState(""); const [message, setMessage] = useState("Choose a provider or connect an Admin server."); const submit = () => { setMessage("Admin sign-in is disabled until a server-side authentication provider is configured. Passwords are never stored in this app."); }; return <div className="modal-back"><section className="modal login-modal"><button className="modal-close" onClick={onClose}>×</button><span className="eyebrow">ACCOUNT</span><h2>Sign in to AsV_IDE</h2><p>Your display name appears in the welcome screen after a connected provider returns it.</p><div className="login-providers"><section><b>Google</b><small>Continue with Google after OAuth is configured.</small><button onClick={() => setMessage("Google sign-in needs your OAuth client ID before it can be connected.")}>Continue with Google</button></section><section><b>GitHub</b><small>Connect a GitHub account for repository sync.</small><button onClick={() => setMessage("GitHub sign-in needs your OAuth client ID before it can be connected.")}>Continue with GitHub</button></section></div><div className="admin-login"><b>Admin access</b><input value={username} onChange={event => setUsername(event.target.value)} placeholder="Username"/><input type="password" value={password} onChange={event => setPassword(event.target.value)} placeholder="Password"/><button className="primary" onClick={submit}>Sign in securely</button><small>{message}</small></div></section></div>; }
+function AdminPanel({ about, setAbout, hiring, setHiring }: { about: string; setAbout: (value: string) => void; hiring: string; setHiring: (value: string) => void }) { return <article className="admin-panel"><span className="eyebrow">ADMIN WORKSPACE</span><h1>Welcome Admin.</h1><p>Edit the live community panels below. Your changes save locally and appear immediately in the sidebar and banner.</p><label>About AsV_IDE<textarea value={about} onChange={event => setAbout(event.target.value)} /></label><label>Discord / hiring banner<textarea value={hiring} onChange={event => setHiring(event.target.value)} /></label><div className="admin-status">● Changes saved locally</div></article>; }
+function Settings({ theme, setTheme, onClose }: { theme: string; setTheme: (theme: string) => void; onClose: () => void }) { const [spotify, setSpotify] = useState(false); const [playing, setPlaying] = useState(false); return <div className="modal-back"><section className="modal settings-modal"><button className="modal-close" onClick={onClose}>×</button><span className="eyebrow">WORKSPACE SETTINGS</span><h2>Make AsV_IDE yours.</h2><p>Changes save locally and apply across the editor, welcome screen, and notebook.</p><h3>Theme</h3><div className="visual-grid">{themes.map(item => <button key={item} onClick={() => setTheme(item)} className={`visual-swatch ${item} ${theme === item ? "selected" : ""}`}><i/><b>{item}</b></button>)}</div><h3>Spotify</h3>{spotify ? <div className="spotify-player"><div><span className="spotify-dot">●</span><b>Spotify embedded player</b><small>Log in inside Spotify to use your account.</small></div><div className="music-controls"><button onClick={() => setPlaying(!playing)}>{playing ? "❚❚ Pause" : "▶ Play"}</button><button>↶</button><button>↷</button></div><iframe title="Spotify player" src="https://open.spotify.com/embed/playlist/37i9dQZF1DX4JAvHpjipBk?utm_source=generator" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"/></div> : <div className="spotify-connect"><b>Listen while you build.</b><small>Connect opens Spotify’s secure login in the embedded player.</small><button className="primary" onClick={() => setSpotify(true)}>Connect Spotify</button></div>}<h3>AI providers</h3><div className="settings-row"><span>OpenAI, Gemini, Claude, and local Ollama</span><button>Manage keys</button></div></section></div>; }
+function Notebook({ theme, onBack }: { theme: string; onBack: () => void }) { const [code, setCode] = useState("print('Hello, AsV!')"); return <main className={`notebook theme-${theme}`}><header className="notebook-top"><div className="brand"><b>A<span>V</span></b><strong>AsV_IDE</strong><em>NOTEBOOK</em></div><button className="visual-button" onClick={onBack}>← IDE</button></header><section className="notebook-sheet"><div className="notebook-title"><span>LOCAL NOTEBOOK</span><h1>Untitled project</h1><p>Your selected workspace theme applies here too.</p></div><article className="note-cell"><div className="markdown"><b>Welcome to AsV Notebook</b><p>Write, run, and keep project notes alongside your code.</p></div></article><article className="note-cell code-cell"><div className="cell-head"><span>⌘ CODE CELL</span><button>▶</button></div><textarea value={code} onChange={event => setCode(event.target.value)} /></article></section></main>; }
