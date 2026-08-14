@@ -81,7 +81,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   private let localServer = ServerBridge()
   private let startupNavigation = StartupNavigation()
   func applicationDidFinishLaunching(_ notification: Notification) {
-    let task = Process(); task.executableURL = URL(fileURLWithPath: "/usr/bin/env"); task.arguments = ["npm", "run", "start", "--", "--port", "3210"]; task.currentDirectoryURL = URL(fileURLWithPath: "__PROJECT_ROOT__"); task.standardOutput = FileHandle.nullDevice; task.standardError = FileHandle.nullDevice; try? task.run(); server = task
+    let task = Process(); task.executableURL = URL(fileURLWithPath: "/usr/local/bin/node"); task.arguments = ["__PROJECT_ROOT__/node_modules/.bin/vinext", "start", "--port", "3210"]; task.currentDirectoryURL = URL(fileURLWithPath: "__PROJECT_ROOT__"); task.standardOutput = FileHandle.nullDevice; task.standardError = FileHandle.nullDevice; try? task.run(); server = task
     let content = WKUserContentController(); content.add(bridge, name: "asvVault"); content.add(executor, name: "asvExecute"); content.add(localServer, name: "asvServer")
     content.addUserScript(WKUserScript(source: "window.asvVault={save:(provider,key)=>window.webkit.messageHandlers.asvVault.postMessage({provider:provider,key:key})};window.asvExecutor={run:(language,code)=>window.webkit.messageHandlers.asvExecute.postMessage({language:language,code:code})};window.asvServer={start:(language,code,port)=>window.webkit.messageHandlers.asvServer.postMessage({language:language,code:code,port:port})};", injectionTime: .atDocumentStart, forMainFrameOnly: true))
     let config = WKWebViewConfiguration(); config.userContentController = content
