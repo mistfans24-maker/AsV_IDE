@@ -67,7 +67,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   private let executor = ExecutorBridge()
   private let localServer = ServerBridge()
   func applicationDidFinishLaunching(_ notification: Notification) {
-    let task = Process(); task.executableURL = URL(fileURLWithPath: "/usr/bin/env"); task.arguments = ["npm", "run", "dev"]; task.currentDirectoryURL = URL(fileURLWithPath: "__PROJECT_ROOT__"); task.standardOutput = FileHandle.nullDevice; task.standardError = FileHandle.nullDevice; try? task.run(); server = task
+    let task = Process(); task.executableURL = URL(fileURLWithPath: "/usr/bin/env"); task.arguments = ["npm", "run", "start", "--", "--port", "3210"]; task.currentDirectoryURL = URL(fileURLWithPath: "__PROJECT_ROOT__"); task.standardOutput = FileHandle.nullDevice; task.standardError = FileHandle.nullDevice; try? task.run(); server = task
     let content = WKUserContentController(); content.add(bridge, name: "asvVault"); content.add(executor, name: "asvExecute"); content.add(localServer, name: "asvServer")
     content.addUserScript(WKUserScript(source: "window.asvVault={save:(provider,key)=>window.webkit.messageHandlers.asvVault.postMessage({provider:provider,key:key})};window.asvExecutor={run:(language,code)=>window.webkit.messageHandlers.asvExecute.postMessage({language:language,code:code})};window.asvServer={start:(language,code,port)=>window.webkit.messageHandlers.asvServer.postMessage({language:language,code:code,port:port})};", injectionTime: .atDocumentStart, forMainFrameOnly: true))
     let config = WKWebViewConfiguration(); config.userContentController = content
@@ -78,7 +78,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     window.title = "AsV_IDE"; window.center(); window.contentView = view; window.makeKeyAndOrderFront(nil)
     mainWindow = window
     NSApp.activate(ignoringOtherApps: true)
-    DispatchQueue.main.asyncAfter(deadline: .now() + 2) { view.load(URLRequest(url: URL(string: "http://localhost:3000/")!)) }
+    loadWorkspace(in: view)
+  }
+  private func loadWorkspace(in view: WKWebView, attempt: Int = 0) {
+    let url = URL(string: "http://localhost:3210/")!
+    URLSession.shared.dataTask(with: url) { _, _, error in
+      if error == nil { DispatchQueue.main.async { view.load(URLRequest(url: url)) } }
+      else if attempt < 20 { DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { self.loadWorkspace(in: view, attempt: attempt + 1) } }
+    }.resume()
   }
   func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
   func applicationWillTerminate(_ notification: Notification) { server?.terminate(); localServer.stopAll() }
