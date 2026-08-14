@@ -48,6 +48,7 @@ export default function Home() {
   const [runOutput, setRunOutput] = useState("Ready to run locally.");
   const [glyphLine, setGlyphLine] = useState("");
   const [code, setCode] = useState(sketch);
+  const [workspaceLoaded, setWorkspaceLoaded] = useState(false);
 
   useEffect(() => {
     const makeGlyphs = () => setGlyphLine(Array.from({ length: 24 }, () => glyphs[Math.floor(Math.random() * glyphs.length)]).join(""));
@@ -66,6 +67,19 @@ export default function Home() {
   useEffect(() => {
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => undefined);
   }, []);
+
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("asv-ide-workspace") || "null");
+      if (saved) { setProjectName(saved.projectName || "blink-node"); setLanguage(saved.language || "Arduino C++"); setCode(saved.code || sketch); }
+    } catch { /* Start with a clean local workspace if saved data is invalid. */ }
+    setWorkspaceLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    if (!workspaceLoaded) return;
+    localStorage.setItem("asv-ide-workspace", JSON.stringify({ projectName, language, code }));
+  }, [workspaceLoaded, projectName, language, code]);
 
   async function connectUsb() {
     const localBrowser = navigator as Navigator & { serial?: { requestPort: () => Promise<{ open: (options: { baudRate: number }) => Promise<void> }> } };
@@ -173,7 +187,9 @@ function VisualModal({value,onChoose,onClose}:{value:string;onChoose:(theme:stri
 function RunPanel({code,language,output,setOutput,onClose}:{code:string;language:string;output:string;setOutput:(text:string)=>void;onClose:()=>void}) { const run=()=>{ if(language==="HTML") { setOutput("HTML preview refreshed below."); return; } const runner=(window as Window & {asvExecutor?:{run:(language:string,code:string)=>void}}).asvExecutor; if(!runner){setOutput("Open the native AsV_IDE app to run local Python, Ruby, Lua, or JavaScript.");return;} if(!["Python","Ruby","Lua","JavaScript"].includes(language)){setOutput("Arduino C++ needs the installed board toolchain and a connected board to compile/upload.");return;} setOutput(`Running ${language} locally…`);runner.run(language,code);}; return <div className="modal-back"><section className="modal run-panel"><button className="modal-close" onClick={onClose}>×</button><span className="eyebrow">LOCAL EXECUTION</span><h2>Run {language}</h2><p>Nothing is sent to a cloud service.</p><button className="primary" onClick={run}>▶ Execute code</button>{language==="HTML"?<iframe title="HTML preview" sandbox="allow-scripts" srcDoc={code}/>:<pre className="run-output">{output}</pre>}</section></div>; }
 function NotebookPage({background,onBack}:{background:string;onBack:()=>void}) {
   const starter = "print('Hello, AsV!')\n\n# Write a visual or local project here\nmessage = 'Build without limits'\nprint(message)\n";
-  const [code,setCode]=useState(starter); const [language,setLanguage]=useState("Python"); const [output,setOutput]=useState("Ready — click Run to execute locally."); const [port,setPort]=useState("8000"); const [url,setUrl]=useState(""); const [view,setView]=useState("code");
+  const [code,setCode]=useState(starter); const [language,setLanguage]=useState("Python"); const [output,setOutput]=useState("Ready — click Run to execute locally."); const [port,setPort]=useState("8000"); const [url,setUrl]=useState(""); const [view,setView]=useState("code"); const [loaded,setLoaded]=useState(false);
+  useEffect(()=>{try{const saved=JSON.parse(localStorage.getItem("asv-notebook")||"null");if(saved){setCode(saved.code||starter);setLanguage(saved.language||"Python");setOutput(saved.output||"Ready — click Run to execute locally.");setPort(saved.port||"8000");setView(saved.view||"code");}}catch{}setLoaded(true);},[]);
+  useEffect(()=>{if(loaded)localStorage.setItem("asv-notebook",JSON.stringify({code,language,output,port,view}));},[loaded,code,language,output,port,view]);
   useEffect(()=>{const receive=(event:Event)=>{const result=(event as CustomEvent<string>).detail;setOutput(result);if(result.startsWith("http"))setUrl(result);};window.addEventListener("asv-server-output",receive);return()=>window.removeEventListener("asv-server-output",receive);},[]);
   const run=()=>{const bridge=(window as Window & {asvExecutor?:{run:(language:string,code:string)=>void}}).asvExecutor;if(!bridge){setOutput("Open the native AsV_IDE app to run this local cell.");return;}setOutput(`Running ${language} cell…`);bridge.run(language,code);};
   const start=()=>{const bridge=(window as Window & {asvServer?:{start:(language:string,code:string,port:string)=>void}}).asvServer;if(!bridge){setOutput("Open the native AsV_IDE app to start a localhost server.");return;}setOutput(`Starting localhost:${port}…`);bridge.start(language,code,port);};
