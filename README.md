@@ -1,6 +1,6 @@
 # AsV_IDE
 
-**A local-first maker workspace for ESP32, Arduino, Python, web projects, and creative code.**
+**A local-first workspace for code, notebooks, hardware, web projects, and creative experiments.**
 
 AsV_IDE is an early public build. It combines a project welcome screen, notebook-style coding workspace, editable project files, theme settings, a visual canvas, and a macOS wrapper app.
 
@@ -37,10 +37,10 @@ npm run build
 
 ## What works today
 
-- Local project creation and saved workspace preferences
-- Colab-inspired notebook/editor interface with syntax colouring
-- Project README/start screen, themes, animated public welcome screen, and visual canvas
-- Local code execution bridge in the macOS wrapper for supported installed runtimes
+- Language-aware project creation with templates for Arduino C++, Python, MicroPython, JavaScript, TypeScript, HTML, CSS, C/C++, C#, Java, Kotlin, Swift, Go, Rust, Lua, Ruby, PHP, Bash, SQL, R, JSON, YAML, Markdown, and plain text
+- Local project files, search, file creation/deletion, autosaved workspace preferences, and a project README that names the real starter file
+- Colab-inspired notebook/editor interface, themes, animated welcome screen, and visual canvas
+- Local code execution bridge in the macOS wrapper for installed Python, JavaScript, Lua, and Ruby runtimes
 - Private backend repository prepared for future OAuth work
 
 ## Important safety notes
@@ -48,6 +48,7 @@ npm run build
 - Never commit `.env` files, OAuth client secrets, SSH keys, or API keys. They are ignored by default.
 - Google/GitHub sign-in is intentionally not live yet. Real OAuth needs a deployed private backend, server-side session handling, and registered callback URLs.
 - GitHub Pages can host static sites, but it cannot safely run the OAuth backend or the current server-rendered app by itself.
+- Templates make a language ready to edit; they do not bundle every compiler, interpreter, package manager, debugger, or device toolchain. Install the runtime/toolchain you need locally before execution support can be added.
 - This project is not yet a replacement for Arduino IDE/PlatformIO for board flashing. Treat ESP32/Arduino integration as work in progress.
 
 ## Contribute
