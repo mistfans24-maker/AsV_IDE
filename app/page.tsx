@@ -53,7 +53,7 @@ export default function Home() {
     const makeGlyphs = () => setGlyphLine(Array.from({ length: 24 }, () => glyphs[Math.floor(Math.random() * glyphs.length)]).join(""));
     makeGlyphs();
     const characterTimer = window.setInterval(makeGlyphs, 100);
-    const bootTimer = window.setTimeout(() => setBooting(false), 2100);
+    const bootTimer = window.setTimeout(() => setBooting(false), 600);
     return () => { window.clearInterval(characterTimer); window.clearTimeout(bootTimer); };
   }, []);
 
