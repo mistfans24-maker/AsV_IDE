@@ -60,18 +60,33 @@ final class ServerBridge: NSObject, WKScriptMessageHandler {
   private func publish(_ output: String) { let json = (try? JSONEncoder().encode(output)).flatMap { String(data: $0, encoding: .utf8) } ?? "\"Output unavailable\""; webView?.evaluateJavaScript("window.dispatchEvent(new CustomEvent('asv-server-output',{detail:\(json)}));") }
 }
 
+final class StartupNavigation: NSObject, WKNavigationDelegate {
+  private var attempts = 0
+  func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { attempts = 0 }
+  func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation?, withError error: Error) {
+    guard attempts < 20 else {
+      webView.loadHTMLString("<body style='margin:0;background:#08161b;color:#d8f4f0;font:15px -apple-system,system-ui;display:grid;place-items:center;height:100vh;text-align:center'><div><b>AsV_IDE could not start its local workspace.</b><p style='color:#7fa1a5'>Close the app and open it again.</p></div></body>", baseURL: nil)
+      return
+    }
+    attempts += 1
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { webView.load(URLRequest(url: URL(string: "http://127.0.0.1:3210/")!)) }
+  }
+}
+
 final class AppDelegate: NSObject, NSApplicationDelegate {
   private var server: Process?
   private var mainWindow: NSWindow?
   private let bridge = VaultBridge()
   private let executor = ExecutorBridge()
   private let localServer = ServerBridge()
+  private let startupNavigation = StartupNavigation()
   func applicationDidFinishLaunching(_ notification: Notification) {
     let task = Process(); task.executableURL = URL(fileURLWithPath: "/usr/bin/env"); task.arguments = ["npm", "run", "start", "--", "--port", "3210"]; task.currentDirectoryURL = URL(fileURLWithPath: "__PROJECT_ROOT__"); task.standardOutput = FileHandle.nullDevice; task.standardError = FileHandle.nullDevice; try? task.run(); server = task
     let content = WKUserContentController(); content.add(bridge, name: "asvVault"); content.add(executor, name: "asvExecute"); content.add(localServer, name: "asvServer")
     content.addUserScript(WKUserScript(source: "window.asvVault={save:(provider,key)=>window.webkit.messageHandlers.asvVault.postMessage({provider:provider,key:key})};window.asvExecutor={run:(language,code)=>window.webkit.messageHandlers.asvExecute.postMessage({language:language,code:code})};window.asvServer={start:(language,code,port)=>window.webkit.messageHandlers.asvServer.postMessage({language:language,code:code,port:port})};", injectionTime: .atDocumentStart, forMainFrameOnly: true))
     let config = WKWebViewConfiguration(); config.userContentController = content
     let view = WKWebView(frame: NSRect(x: 0, y: 0, width: 1280, height: 800), configuration: config)
+    view.navigationDelegate = startupNavigation
     executor.webView = view
     localServer.webView = view
     let window = NSWindow(contentRect: view.frame, styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
@@ -79,15 +94,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     mainWindow = window
     NSApp.activate(ignoringOtherApps: true)
     view.loadHTMLString("<body style='margin:0;background:#08161b;color:#7cf8ea;font:13px -apple-system,system-ui;display:grid;place-items:center;height:100vh;letter-spacing:.12em'>STARTING AsV_IDE…</body>", baseURL: nil)
-    loadWorkspace(in: view)
+    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { self.loadWorkspace(in: view) }
   }
-  private func loadWorkspace(in view: WKWebView, attempt: Int = 0) {
+  private func loadWorkspace(in view: WKWebView) {
     let url = URL(string: "http://127.0.0.1:3210/")!
-    URLSession.shared.dataTask(with: url) { _, _, error in
-      if error == nil { DispatchQueue.main.async { view.load(URLRequest(url: url)) } }
-      else if attempt < 20 { DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { self.loadWorkspace(in: view, attempt: attempt + 1) } }
-      else { DispatchQueue.main.async { view.loadHTMLString("<body style='margin:0;background:#08161b;color:#d8f4f0;font:15px -apple-system,system-ui;display:grid;place-items:center;height:100vh;text-align:center'><div><b>AsV_IDE could not start its local workspace.</b><p style='color:#7fa1a5'>Close the app and open it again.</p></div></body>", baseURL: nil) } }
-    }.resume()
+    view.load(URLRequest(url: url))
   }
   func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
   func applicationWillTerminate(_ notification: Notification) { server?.terminate(); localServer.stopAll() }
