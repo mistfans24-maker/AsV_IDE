@@ -1333,6 +1333,96 @@ footer b {
     11px/1.5 var(--font-geist-mono),
     monospace;
 }
+.notebook-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.notebook-actions > span {
+  margin-right: 5px;
+  color: #79aaa5;
+  font-size: 10px;
+}
+.notebook-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 13px;
+  color: #799da0;
+  font-size: 10px;
+}
+.notebook-toolbar select {
+  border: 1px solid #315d60;
+  border-radius: 5px;
+  padding: 6px 8px;
+  background: #102b30;
+  color: #c8eee8;
+  font-size: 10px;
+}
+.notebook-toolbar span:last-child { margin-left: auto; }
+.cell-head .cell-play {
+  width: auto;
+  height: 27px;
+  margin-left: auto;
+  border-radius: 5px;
+  padding: 0 10px;
+  background: var(--teal);
+  color: #042124;
+  font-weight: 800;
+}
+.cell-head .cell-remove {
+  width: 27px;
+  height: 27px;
+  border: 1px solid #315d60;
+  border-radius: 5px;
+  background: transparent;
+  color: #8caead;
+  font-size: 17px;
+}
+.text-cell textarea {
+  display: block;
+  width: 100%;
+  min-height: 105px;
+  resize: vertical;
+  border: 0;
+  outline: 0;
+  padding: 17px;
+  background: #0c2429;
+  color: #d9f5ef;
+  font: 15px/1.65 Arial, Helvetica, sans-serif;
+}
+.cell-add-row {
+  display: flex;
+  gap: 6px;
+  padding: 8px 12px;
+  border-top: 1px solid #294d51;
+  background: #0b1e23;
+  opacity: .64;
+  transition: opacity .2s ease;
+}
+.note-cell:hover .cell-add-row, .cell-add-row:focus-within { opacity: 1; }
+.cell-add-row button {
+  border: 0;
+  border-radius: 4px;
+  padding: 5px 8px;
+  background: #14343a;
+  color: #a7cfca;
+  font-size: 10px;
+}
+.provider-logo {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  color: #fff;
+  font-size: 20px;
+  font-weight: 900;
+  line-height: 1;
+}
+.provider-logo.discord { background: #5865f2; }
+.provider-logo.google { background: #fff; color: #4285f4; }
+.provider-logo.github { background: #10151b; border: 1px solid #3a5557; font-size: 15px; }
 .server-cell {
   display: grid;
   grid-template-columns: 1fr 74px 135px;

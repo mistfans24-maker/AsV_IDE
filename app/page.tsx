@@ -1160,21 +1160,21 @@ function Login({
         <p>Sign in to show your name and avatar across AsV_IDE. Projects, code, and API keys stay on this computer.</p>
         <div className="login-providers">
           <section className="discord-provider">
-            <span className="provider-badge discord-badge">◉</span><b>Discord</b>
+            <ProviderLogo provider="discord" /><b>Discord</b>
             <small>Fastest option. Uses your Discord display name and avatar.</small>
             <button className="primary" onClick={onDiscord}>
               Continue with Discord
             </button>
           </section>
           <section>
-            <span className="provider-badge google-badge">G</span><b>Google</b>
+            <ProviderLogo provider="google" /><b>Google</b>
             <small>Use your Google profile. Google may open a secure browser page.</small>
             <button className="primary" onClick={onGoogle}>
               Continue with Google
             </button>
           </section>
           <section>
-            <span className="provider-badge github-badge">⌘</span><b>GitHub</b>
+            <ProviderLogo provider="github" /><b>GitHub</b>
             <small>Repository sync will appear here when its OAuth app is configured.</small>
             <button disabled aria-disabled="true">GitHub coming soon</button>
           </section>
@@ -1193,6 +1193,10 @@ function Login({
       </section>
     </div>
   );
+}
+function ProviderLogo({ provider }: { provider: "discord" | "google" | "github" }) {
+  const labels = { discord: "Discord", google: "Google", github: "GitHub" };
+  return <span className={`provider-logo ${provider}`} aria-label={labels[provider]} title={labels[provider]}>{provider === "discord" ? "⌁" : provider === "google" ? "G" : "◖◗"}</span>;
 }
 function AdminPanel({
   about,
@@ -1419,20 +1423,27 @@ function AIKeySettings() {
     </>
   );
 }
+type NotebookCell = { id: string; type: "code" | "text"; source: string; output?: string };
+const newNotebookCell = (type: NotebookCell["type"]): NotebookCell => ({
+  id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+  type,
+  source: type === "code" ? "print('Hello, AsV!')" : "# Notes\nWrite your explanation here.",
+});
 function Notebook({ theme, onBack }: { theme: string; onBack: () => void }) {
-  const [code, setCode] = useState("print('Hello, AsV!')");
   const [title, setTitle] = useState("Untitled notebook");
   const [language, setLanguage] = useState("Python");
-  const [output, setOutput] = useState("Run a cell to see local output here.");
+  const [cells, setCells] = useState<NotebookCell[]>([newNotebookCell("text"), newNotebookCell("code")]);
   const [ready, setReady] = useState(false);
+  const runningCell = useRef<string | null>(null);
   useEffect(() => {
     try {
       const saved = JSON.parse(
         localStorage.getItem("asv-ide-notebook") || "null",
       );
-      if (saved?.code) setCode(saved.code);
       if (saved?.title) setTitle(saved.title);
       if (saved?.language) setLanguage(saved.language);
+      if (Array.isArray(saved?.cells) && saved.cells.length) setCells(saved.cells);
+      else if (saved?.code) setCells([{ ...newNotebookCell("code"), source: saved.code }]);
     } catch {
       /* keep a fresh notebook */
     }
@@ -1442,29 +1453,35 @@ function Notebook({ theme, onBack }: { theme: string; onBack: () => void }) {
     if (ready)
       localStorage.setItem(
         "asv-ide-notebook",
-        JSON.stringify({ code, title, language }),
+        JSON.stringify({ cells, title, language }),
       );
-  }, [ready, code, title, language]);
+  }, [ready, cells, title, language]);
   useEffect(() => {
-    const receive = (event: Event) =>
-      setOutput((event as CustomEvent<string>).detail);
+    const receive = (event: Event) => {
+      const id = runningCell.current;
+      if (!id) return;
+      const output = (event as CustomEvent<string>).detail;
+      setCells((current) => current.map((cell) => cell.id === id ? { ...cell, output } : cell));
+      runningCell.current = null;
+    };
     window.addEventListener("asv-execute-output", receive);
     return () => window.removeEventListener("asv-execute-output", receive);
   }, []);
-  const runCell = () => {
+  const updateCell = (id: string, source: string) =>
+    setCells((current) => current.map((cell) => cell.id === id ? { ...cell, source } : cell));
+  const runCell = (cell: NotebookCell) => {
     const runner = (
       window as Window & {
         asvExecutor?: { run: (value: string, source: string) => void };
       }
     ).asvExecutor;
     if (!runner) {
-      setOutput(
-        "Open the macOS AsV_IDE app to run this notebook cell locally.",
-      );
+      setCells((current) => current.map((item) => item.id === cell.id ? { ...item, output: "Open the macOS AsV_IDE app to run this notebook cell locally." } : item));
       return;
     }
-    setOutput(`Running ${language}…`);
-    runner.run(language, code);
+    runningCell.current = cell.id;
+    setCells((current) => current.map((item) => item.id === cell.id ? { ...item, output: `Running ${language} locally…` } : item));
+    runner.run(language, cell.source);
   };
   return (
     <main className={`notebook theme-${theme}`}>
@@ -1476,56 +1493,29 @@ function Notebook({ theme, onBack }: { theme: string; onBack: () => void }) {
           <strong>AsV_IDE</strong>
           <em>NOTEBOOK</em>
         </div>
-        <button className="visual-button" onClick={onBack}>
-          ← IDE
-        </button>
+        <div className="notebook-actions">
+          <span>● Saved locally</span>
+          <button className="visual-button" onClick={() => setCells((current) => [...current, newNotebookCell("code")])}>＋ Code</button>
+          <button className="visual-button" onClick={() => setCells((current) => [...current, newNotebookCell("text")])}>＋ Text</button>
+          <button className="visual-button" onClick={onBack}>← IDE</button>
+        </div>
       </header>
       <section className="notebook-sheet">
         <div className="notebook-title">
-          <span>LOCAL NOTEBOOK · AUTOSAVED</span>
+              <span>LOCAL NOTEBOOK · AUTOSAVED · COLAB-STYLE CELLS</span>
           <input
             aria-label="Notebook title"
             value={title}
             onChange={(event) => setTitle(event.target.value)}
           />
-          <p>
-            Cells stay on this device. Choose a local runtime you have
-            installed.
-          </p>
+          <div className="notebook-toolbar"><span>Runtime: local {language}</span><select aria-label="Notebook language" value={language} onChange={(event) => setLanguage(event.target.value)}>{["Python", "JavaScript", "Lua", "Ruby"].map((item) => <option key={item}>{item}</option>)}</select><span>Code executes on this Mac only.</span></div>
         </div>
-        <article className="note-cell">
-          <div className="markdown">
-            <b>Welcome to AsV Notebook</b>
-            <p>
-              Write a small experiment, run it locally, and keep the output
-              beside your notes.
-            </p>
-          </div>
-        </article>
-        <article className="note-cell code-cell">
-          <div className="cell-head">
-            <span>⌘ CODE CELL</span>
-            <select
-              aria-label="Notebook language"
-              value={language}
-              onChange={(event) => setLanguage(event.target.value)}
-            >
-              {["Python", "JavaScript", "Lua", "Ruby"].map((item) => (
-                <option key={item}>{item}</option>
-              ))}
-            </select>
-            <button onClick={runCell} aria-label="Run notebook cell">
-              ▶
-            </button>
-          </div>
-          <textarea
-            aria-label="Notebook code cell"
-            spellCheck="false"
-            value={code}
-            onChange={(event) => setCode(event.target.value)}
-          />
-          <pre>{output}</pre>
-        </article>
+        {cells.map((cell, index) => <article className={`note-cell ${cell.type === "code" ? "code-cell" : "text-cell"}`} key={cell.id}>
+          <div className="cell-head"><span>{cell.type === "code" ? "⌘ CODE" : "T TEXT"} · CELL {index + 1}</span>{cell.type === "code" && <button className="cell-play" onClick={() => runCell(cell)} aria-label={`Run cell ${index + 1}`}>▶ Run</button>}<button className="cell-remove" onClick={() => setCells((current) => current.length === 1 ? current : current.filter((item) => item.id !== cell.id))} aria-label={`Remove cell ${index + 1}`}>×</button></div>
+          <textarea aria-label={`${cell.type} cell ${index + 1}`} spellCheck={cell.type !== "code"} value={cell.source} onChange={(event) => updateCell(cell.id, event.target.value)} />
+          {cell.type === "code" && <pre>{cell.output || "Run this cell to see local output."}</pre>}
+          <div className="cell-add-row"><button onClick={() => setCells((current) => { const at = current.findIndex((item) => item.id === cell.id); return [...current.slice(0, at + 1), newNotebookCell("code"), ...current.slice(at + 1)]; })}>＋ Code</button><button onClick={() => setCells((current) => { const at = current.findIndex((item) => item.id === cell.id); return [...current.slice(0, at + 1), newNotebookCell("text"), ...current.slice(at + 1)]; })}>＋ Text</button></div>
+        </article>)}
       </section>
     </main>
   );
