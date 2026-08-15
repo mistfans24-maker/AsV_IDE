@@ -164,6 +164,7 @@ function Icon({ name }: { name: string }) {
 
 export default function Home() {
   const importInput = useRef<HTMLInputElement>(null);
+  const terminalRef = useRef<HTMLElement>(null);
   const [booting, setBooting] = useState(true);
   const [welcome, setWelcome] = useState(true);
   const [project, setProject] = useState<Project>({
@@ -256,9 +257,15 @@ export default function Home() {
     };
     void restoreSession();
   }, []);
+  const writeTerminal = (message: string) => {
+    setTerminal(message);
+    window.requestAnimationFrame(() =>
+      terminalRef.current?.scrollIntoView({ behavior: "smooth", block: "end" }),
+    );
+  };
   useEffect(() => {
     const receive = (event: Event) =>
-      setTerminal((event as CustomEvent<string>).detail);
+      writeTerminal((event as CustomEvent<string>).detail);
     window.addEventListener("asv-execute-output", receive);
     return () => window.removeEventListener("asv-execute-output", receive);
   }, []);
@@ -355,8 +362,19 @@ export default function Home() {
     reader.readAsText(selected);
   };
   const run = () => {
+    const isMicroPython =
+      project.language === "MicroPython" ||
+      /(^|\n)\s*(from\s+machine\s+import|import\s+machine\b)/m.test(
+        project.code,
+      );
+    if (isMicroPython) {
+      writeTerminal(
+        "ESP32 / MicroPython code detected. This stays in the bottom console: it cannot run with macOS Python because the 'machine' module only exists on a MicroPython board. Connect a flashed ESP32, then use Upload to device when that transport is configured.",
+      );
+      return;
+    }
     if (project.language === "HTML") {
-      setTerminal(
+      writeTerminal(
         "HTML projects open in your browser preview when served locally.",
       );
       return;
@@ -367,18 +385,18 @@ export default function Home() {
       }
     ).asvExecutor;
     if (!runner) {
-      setTerminal(
+      writeTerminal(
         "Open the macOS AsV_IDE app to run installed local runtimes.",
       );
       return;
     }
     if (!localRuntimes.has(project.language)) {
-      setTerminal(
+      writeTerminal(
         `${project.language} is ready to edit. Running it needs its local compiler/runtime, which is not bundled yet.`,
       );
       return;
     }
-    setTerminal(`Running ${project.language} locally…`);
+    writeTerminal(`Running ${project.language} locally…`);
     runner.run(project.language, project.code);
   };
   if (booting)
@@ -574,7 +592,7 @@ export default function Home() {
         </aside>
       </section>
       <section className="community-banner">◈ {hiring}</section>
-      <section className="terminal">
+      <section className="terminal" ref={terminalRef} aria-live="polite">
         <div className="terminal-bar">
           <div>
             <b>TERMINAL</b>
