@@ -25,8 +25,8 @@ mkdir -p "$RUNTIME"
 # The standalone app must carry Node itself. Native macOS apps do not inherit
 # a terminal PATH, so relying on `env node` makes direct JavaScript execution
 # fail even when Node is installed on the developer's machine.
-cp "$(command -v node)" "$RUNTIME/node"
 rsync -a --delete --exclude='.env*' --exclude='.git' --exclude='outputs' --exclude='work' --exclude='docs' --exclude='.DS_Store' --exclude='._*' --exclude='node_modules/.cache' "$ROOT/" "$RUNTIME/"
+cp "$(command -v node)" "$RUNTIME/node"
 codesign --force --deep --sign - "$OUT"
 codesign --verify --deep --strict --verbose=2 "$OUT"
 echo "Built $OUT"
