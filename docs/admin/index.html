@@ -16,13 +16,14 @@
       .card { border:1px solid var(--line); border-radius:20px; background:linear-gradient(140deg,#0b292ddd,#071b1fdd); box-shadow:0 18px 60px #00000028; } .card-inner { padding:27px; } .section-title { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; } h2 { margin:0; font-size:20px; letter-spacing:-.04em; } p { color:var(--muted); line-height:1.6; }
       #login { max-width:560px; padding:30px; margin-top:24px; } #login h2 { font-size:25px; } #login button { margin-top:10px; }
       .grid { display:grid; grid-template-columns:repeat(2,1fr); gap:15px; margin:2px 0 15px; } .metric-card { position:relative; overflow:hidden; padding:24px; min-height:162px; } .metric-card::after { content:""; position:absolute; width:130px; height:130px; border-radius:50%; right:-38px; bottom:-63px; background:radial-gradient(circle,#2ce4d930,transparent 67%); } .metric-label { display:block; color:var(--muted); font:700 10px ui-monospace,monospace; letter-spacing:.15em; } .metric { display:block; margin:14px 0 4px; color:var(--mint); font-size:48px; font-weight:900; line-height:1; letter-spacing:-.08em; } small { color:var(--muted); }
+      .operations { display:grid; grid-template-columns:1.2fr .8fr; gap:15px; margin-bottom:15px; } .status-card,.quick-card { padding:23px; } .state-line { display:flex; align-items:center; gap:10px; margin:16px 0 9px; font-weight:800; font-size:18px; letter-spacing:-.03em; } .state-dot { width:10px; height:10px; border-radius:50%; background:var(--mint); box-shadow:0 0 14px var(--mint); } .state-dot.warning { background:var(--warning); box-shadow:0 0 14px var(--warning); } .state-copy { margin:0; font-size:13px; } .quick-links { display:grid; gap:8px; margin-top:15px; } .quick-links a { display:flex; align-items:center; justify-content:space-between; color:#d7f8f4; border:1px solid var(--line-soft); border-radius:10px; padding:10px 11px; text-decoration:none; font-size:13px; transition:.18s ease; } .quick-links a:hover { border-color:var(--mint); background:#20dccc0c; transform:translateX(2px); } .quick-links a::after { content:"↗"; color:var(--mint); font-size:16px; } .health { display:inline-flex; margin-top:11px; padding:5px 8px; border-radius:99px; color:#a8dbd5; background:#154144; font:700 10px ui-monospace,monospace; letter-spacing:.08em; }
       .controls { overflow:hidden; } .controls-head { padding:27px 27px 22px; border-bottom:1px solid var(--line-soft); background:linear-gradient(90deg,#113d3ddd,transparent); } .controls-head p { max-width:690px; margin:7px 0 0; font-size:14px; }.control-body { padding:8px 27px 27px; }
       .switch { display:flex; align-items:center; justify-content:space-between; gap:18px; padding:21px 0; border-bottom:1px solid var(--line-soft); } .switch:last-of-type { border-bottom:0; } .switch b { display:block; font-size:15px; } .switch p { margin:3px 0 0; font-size:13px; } .switch input { flex:0 0 auto; appearance:none; cursor:pointer; width:54px; height:30px; margin:0; padding:3px; border:1px solid #39676a; border-radius:999px; background:#153438; transition:.22s ease; } .switch input::after { content:""; display:block; width:22px; height:22px; border-radius:50%; background:#8aabaa; box-shadow:0 2px 6px #0007; transition:.22s ease; } .switch input:checked { border-color:var(--mint); background:#14877e; } .switch input:checked::after { transform:translateX(24px); background:#eafffd; } .switch input:focus-visible, button:focus-visible, a:focus-visible, #discord:focus-visible { outline:3px solid #7affee88; outline-offset:3px; }
       .danger-row { position:relative; } .danger-row::before { content:"MAINTENANCE"; color:var(--warning); font:700 10px ui-monospace,monospace; letter-spacing:.12em; }
       label { display:block; margin-top:23px; color:#d0efec; font-weight:750; font-size:13px; } #discord { width:100%; margin-top:9px; padding:14px 15px; border:1px solid var(--line); border-radius:11px; color:var(--text); background:#061a1e; font:inherit; transition:border .2s ease, box-shadow .2s ease; } #discord:hover { border-color:#39777a; } #discord:focus { border-color:var(--mint); box-shadow:0 0 0 4px #32e5d21d; }
       .actions { display:flex; flex-wrap:wrap; gap:10px; margin-top:25px; } button { min-height:43px; border:1px solid transparent; border-radius:10px; padding:11px 16px; color:#032022; background:var(--mint); box-shadow:0 8px 20px #23dfca22; font:800 14px inherit; cursor:pointer; transition:transform .18s ease,filter .18s ease,box-shadow .18s ease; } button:hover { transform:translateY(-1px); filter:brightness(1.06); box-shadow:0 12px 24px #23dfca2b; } button.secondary { color:#d9f8f5; border-color:var(--line); background:#12373b; box-shadow:none; } .status { min-height:24px; margin:17px 0 0; color:var(--muted); font-size:13px; } .status::before { content:"●"; color:var(--mint); margin-right:7px; } .status.error { color:var(--danger); } .status.error::before { color:var(--danger); }
       .footer-note { display:flex; justify-content:space-between; gap:20px; margin-top:18px; color:#749a98; font:650 10px ui-monospace,monospace; letter-spacing:.11em; } [hidden] { display:none!important; }
-      @media(max-width:650px) { main { width:min(100% - 28px,1060px); padding-top:12px; } nav { padding-bottom:21px; } .hero { grid-template-columns:1fr; padding:43px 0 26px; } .live-chip { width:max-content; } .grid { grid-template-columns:1fr; } .card-inner,#login,.controls-head,.control-body { padding-left:20px; padding-right:20px; } .footer-note { display:block; line-height:2; } }
+      @media(max-width:650px) { main { width:min(100% - 28px,1060px); padding-top:12px; } nav { padding-bottom:21px; } .hero { grid-template-columns:1fr; padding:43px 0 26px; } .live-chip { width:max-content; } .grid,.operations { grid-template-columns:1fr; } .card-inner,#login,.controls-head,.control-body { padding-left:20px; padding-right:20px; } .footer-note { display:block; line-height:2; } }
     </style>
   </head>
   <body>
@@ -54,6 +55,23 @@
           <article class="card metric-card"><span class="metric-label">LAST 7 DAYS</span><b id="week" class="metric">—</b><small>recent release interest</small></article>
         </div>
 
+        <div class="operations">
+          <article class="card status-card">
+            <div class="eyebrow">PUBLIC STATUS</div>
+            <div class="state-line"><span id="stateDot" class="state-dot"></span><span id="releaseState">Checking release…</span></div>
+            <p id="releaseCopy" class="state-copy">Loading the current public configuration.</p>
+            <span id="health" class="health">API · CHECKING</span>
+          </article>
+          <article class="card quick-card">
+            <div class="eyebrow">QUICK PREVIEW</div>
+            <div class="quick-links">
+              <a href="../" target="_blank" rel="noopener">Public homepage</a>
+              <a href="../download/" target="_blank" rel="noopener">Download page</a>
+              <a id="discordPreview" href="#" target="_blank" rel="noopener" hidden>Open Discord</a>
+            </div>
+          </article>
+        </div>
+
         <section class="card controls">
           <div class="controls-head">
             <div class="eyebrow">RELEASE CONTROLS</div>
@@ -71,7 +89,7 @@
             </div>
             <label for="discord">Discord invite URL</label>
             <input id="discord" type="url" placeholder="https://discord.gg/your-server" autocomplete="url" />
-            <div class="actions"><button id="save">Save public controls</button><button id="refresh" class="secondary">Refresh data</button></div>
+            <div class="actions"><button id="save">Save public controls</button><button id="refresh" class="secondary">Refresh data</button><button id="discard" class="secondary">Discard edits</button></div>
             <p id="status" class="status" aria-live="polite"></p>
           </div>
         </section>
@@ -91,10 +109,18 @@
         $('downloads').checked = data.config.downloadsEnabled; $('siteLocked').checked = data.config.siteLocked; $('discord').value = data.config.discordUrl;
         $('availability').textContent = data.config.downloadsEnabled ? 'Public downloads are live.' : 'Downloads are paused.';
         $('lockStatus').textContent = data.config.siteLocked ? 'Public site is locked for maintenance.' : 'Public site is live.';
+        const locked = data.config.siteLocked;
+        $('releaseState').textContent = locked ? 'Maintenance mode is active' : (data.config.downloadsEnabled ? 'Public release is live' : 'Downloads are paused');
+        $('releaseCopy').textContent = locked ? 'The site and official download route show the maintenance notice.' : (data.config.downloadsEnabled ? 'Visitors can access the official site and download route.' : 'The site remains visible; the official download route is paused.');
+        $('stateDot').className = 'state-dot' + (locked || !data.config.downloadsEnabled ? ' warning' : '');
+        $('health').textContent = 'API · CONNECTED';
+        const discord = $('discordPreview'); discord.hidden = !data.config.discordUrl; if (data.config.discordUrl) discord.href = data.config.discordUrl;
         $('status').textContent = 'Dashboard up to date.';
       }
       $('signIn').onclick = () => location.href = api + '/auth/discord/start?returnTo=' + encodeURIComponent('/AsV_IDE/admin/');
       $('refresh').onclick = () => load().catch(showError);
+      $('discard').onclick = () => load().catch(showError);
+      ['downloads','siteLocked','discord'].forEach((id) => $(id).addEventListener('input', () => { $('status').textContent = 'Unsaved changes — save when ready.'; $('status').className = 'status'; }));
       $('save').onclick = async () => { try { $('status').textContent = 'Saving…'; const response = await fetch(api + '/v1/admin/config', { method:'POST', credentials:'include', headers:{'Content-Type':'application/json'}, body:JSON.stringify({downloadsEnabled:$('downloads').checked,siteLocked:$('siteLocked').checked,discordUrl:$('discord').value.trim()}) }); if (!response.ok) throw new Error((await response.json()).error || 'Save failed.'); await load(); $('status').textContent = 'Saved. Public controls are updated.'; } catch (error) { showError(error); } };
       function showError(error) { $('status').textContent = error.message || 'Something went wrong.'; $('status').className = 'status error'; }
       load().catch(showError);
