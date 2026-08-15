@@ -121,7 +121,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let url = URL(string: "http://127.0.0.1:3210/")!
     view.load(URLRequest(url: url))
   }
-  func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
+  func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
   func applicationWillTerminate(_ notification: Notification) { server?.terminate(); localServer.stopAll() }
 }
 let app = NSApplication.shared; let delegate = AppDelegate(); app.delegate = delegate; app.setActivationPolicy(.regular); app.run()
