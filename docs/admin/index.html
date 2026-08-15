@@ -20,7 +20,7 @@
       <section id="login" class="card"><h2>Administrator sign-in</h2><p>Use the Discord account approved for this project.</p><button id="signIn">Continue with Discord</button></section>
       <section id="dashboard" hidden>
         <div class="grid"><div class="card"><span>DOWNLOAD REQUESTS</span><b id="total" class="metric">—</b><small>all time</small></div><div class="card"><span>LAST 7 DAYS</span><b id="week" class="metric">—</b><small>requested through official download link</small></div></div>
-        <section class="card"><h2>Release controls</h2><p>Pausing downloads makes the official download route return a clear maintenance response instead of a file.</p><div class="switch"><div><b>Downloads available</b><p id="availability">Loading…</p></div><input id="downloads" type="checkbox" aria-label="Enable downloads" /></div><label for="discord">Discord invite URL</label><input id="discord" type="url" placeholder="https://discord.gg/your-server" /><div class="actions"><button id="save">Save changes</button><button id="refresh" class="secondary">Refresh</button></div><p id="status" class="status" aria-live="polite"></p></section>
+        <section class="card"><h2>Release controls</h2><p>Maintenance mode locks the public site, sign-in page, and official download route. Visitors see a clear maintenance message until you unlock it.</p><div class="switch"><div><b>Site maintenance lock</b><p id="lockStatus">Loading…</p></div><input id="siteLocked" type="checkbox" aria-label="Lock public site for maintenance" /></div><div class="switch"><div><b>Downloads available</b><p id="availability">Loading…</p></div><input id="downloads" type="checkbox" aria-label="Enable downloads" /></div><label for="discord">Discord invite URL</label><input id="discord" type="url" placeholder="https://discord.gg/your-server" /><div class="actions"><button id="save">Save changes</button><button id="refresh" class="secondary">Refresh</button></div><p id="status" class="status" aria-live="polite"></p></section>
       </section>
     </main>
     <script>
@@ -33,13 +33,14 @@
         if (!response.ok) throw new Error('Could not load the dashboard.');
         const data = await response.json(); $('login').hidden = true; $('dashboard').hidden = false;
         $('total').textContent = data.stats.downloadsTotal; $('week').textContent = data.stats.downloadsLast7Days;
-        $('downloads').checked = data.config.downloadsEnabled; $('discord').value = data.config.discordUrl;
+        $('downloads').checked = data.config.downloadsEnabled; $('siteLocked').checked = data.config.siteLocked; $('discord').value = data.config.discordUrl;
         $('availability').textContent = data.config.downloadsEnabled ? 'Public downloads are live.' : 'Downloads are paused.';
+        $('lockStatus').textContent = data.config.siteLocked ? 'Public site is locked for maintenance.' : 'Public site is live.';
         $('status').textContent = 'Dashboard up to date.';
       }
       $('signIn').onclick = () => location.href = api + '/auth/discord/start?returnTo=' + encodeURIComponent('/AsV_IDE/admin/');
       $('refresh').onclick = () => load().catch(showError);
-      $('save').onclick = async () => { try { $('status').textContent = 'Saving…'; const response = await fetch(api + '/v1/admin/config', { method:'POST', credentials:'include', headers:{'Content-Type':'application/json'}, body:JSON.stringify({downloadsEnabled:$('downloads').checked,discordUrl:$('discord').value.trim()}) }); if (!response.ok) throw new Error((await response.json()).error || 'Save failed.'); await load(); $('status').textContent = 'Saved. Public controls are updated.'; } catch (error) { showError(error); } };
+      $('save').onclick = async () => { try { $('status').textContent = 'Saving…'; const response = await fetch(api + '/v1/admin/config', { method:'POST', credentials:'include', headers:{'Content-Type':'application/json'}, body:JSON.stringify({downloadsEnabled:$('downloads').checked,siteLocked:$('siteLocked').checked,discordUrl:$('discord').value.trim()}) }); if (!response.ok) throw new Error((await response.json()).error || 'Save failed.'); await load(); $('status').textContent = 'Saved. Public controls are updated.'; } catch (error) { showError(error); } };
       function showError(error) { $('status').textContent = error.message || 'Something went wrong.'; $('status').className = 'status error'; }
       load().catch(showError);
     </script>
