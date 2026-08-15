@@ -89,6 +89,8 @@
             </div>
             <label for="discord">Discord invite URL</label>
             <input id="discord" type="url" placeholder="https://discord.gg/your-server" autocomplete="url" />
+            <label for="supportEmail">Support email</label>
+            <input id="supportEmail" type="email" placeholder="support@example.com" autocomplete="email" />
             <div class="actions"><button id="save">Save public controls</button><button id="refresh" class="secondary">Refresh data</button><button id="discard" class="secondary">Discard edits</button></div>
             <p id="status" class="status" aria-live="polite"></p>
           </div>
@@ -106,7 +108,7 @@
         if (!response.ok) throw new Error('Could not load the dashboard.');
         const data = await response.json(); $('login').hidden = true; $('dashboard').hidden = false;
         $('total').textContent = data.stats.downloadsTotal; $('week').textContent = data.stats.downloadsLast7Days;
-        $('downloads').checked = data.config.downloadsEnabled; $('siteLocked').checked = data.config.siteLocked; $('discord').value = data.config.discordUrl;
+        $('downloads').checked = data.config.downloadsEnabled; $('siteLocked').checked = data.config.siteLocked; $('discord').value = data.config.discordUrl || ''; $('supportEmail').value = data.config.supportEmail || '';
         $('availability').textContent = data.config.downloadsEnabled ? 'Public downloads are live.' : 'Downloads are paused.';
         $('lockStatus').textContent = data.config.siteLocked ? 'Public site is locked for maintenance.' : 'Public site is live.';
         const locked = data.config.siteLocked;
@@ -120,8 +122,8 @@
       $('signIn').onclick = () => location.href = api + '/auth/discord/start?returnTo=' + encodeURIComponent('/AsV_IDE/admin/');
       $('refresh').onclick = () => load().catch(showError);
       $('discard').onclick = () => load().catch(showError);
-      ['downloads','siteLocked','discord'].forEach((id) => $(id).addEventListener('input', () => { $('status').textContent = 'Unsaved changes — save when ready.'; $('status').className = 'status'; }));
-      $('save').onclick = async () => { try { $('status').textContent = 'Saving…'; const response = await fetch(api + '/v1/admin/config', { method:'POST', credentials:'include', headers:{'Content-Type':'application/json'}, body:JSON.stringify({downloadsEnabled:$('downloads').checked,siteLocked:$('siteLocked').checked,discordUrl:$('discord').value.trim()}) }); if (!response.ok) throw new Error((await response.json()).error || 'Save failed.'); await load(); $('status').textContent = 'Saved. Public controls are updated.'; } catch (error) { showError(error); } };
+      ['downloads','siteLocked','discord','supportEmail'].forEach((id) => $(id).addEventListener('input', () => { $('status').textContent = 'Unsaved changes — save when ready.'; $('status').className = 'status'; }));
+      $('save').onclick = async () => { try { const requestedEmail = $('supportEmail').value.trim(); $('status').textContent = 'Saving…'; const response = await fetch(api + '/v1/admin/config', { method:'POST', credentials:'include', headers:{'Content-Type':'application/json'}, body:JSON.stringify({downloadsEnabled:$('downloads').checked,siteLocked:$('siteLocked').checked,discordUrl:$('discord').value.trim(),supportEmail:requestedEmail}) }); if (!response.ok) throw new Error((await response.json()).error || 'Save failed.'); await load(); if (requestedEmail && $('supportEmail').value.trim() !== requestedEmail) { throw new Error('The website is ready for support email, but the live API has not stored it yet.'); } $('status').textContent = 'Saved. Public controls are updated.'; $('status').className = 'status ok'; } catch (error) { showError(error); } };
       function showError(error) { $('status').textContent = error.message || 'Something went wrong.'; $('status').className = 'status error'; }
       load().catch(showError);
     </script>

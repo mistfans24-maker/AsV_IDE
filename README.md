@@ -37,6 +37,15 @@ open outputs/AsV_IDE-Installer.pkg
 
 The installer uses macOS Installer's standard screens and installs AsV_IDE in `/Applications`. It bundles the Node runtime and workspace so it does not depend on a separate project folder; this makes it much larger than the developer DMG. It is unsigned until a Developer ID certificate and notarization are configured.
 
+## Build a drag-to-install macOS DMG
+
+```bash
+bash scripts/build-macos-dmg.sh
+open outputs/AsV_IDE-macOS.dmg
+```
+
+The mounted image presents large **AsV_IDE** and **Applications** icons side-by-side so you can drag the app into Applications. On every launch AsV_IDE checks that its bundled icon and local runtime are present; if the copy is incomplete, it shows repair instructions instead of a broken workspace.
+
 ## Check before changing code
 
 ```bash

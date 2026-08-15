@@ -1,0 +1,10 @@
+#!/bin/bash
+set -eu
+
+# Installer runs this only after placing the application in /Applications.
+# Opening it here gives the first launch the same integrity check as every
+# normal launch, without changing macOS security or user files.
+if [ -d "/Applications/AsV_IDE.app" ]; then
+  /usr/bin/open -a "/Applications/AsV_IDE.app" >/dev/null 2>&1 || true
+fi
+exit 0

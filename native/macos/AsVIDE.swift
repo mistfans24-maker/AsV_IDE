@@ -243,12 +243,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     window.title = "AsV_IDE"; window.center(); window.contentView = view; window.makeKeyAndOrderFront(nil)
     mainWindow = window
     NSApp.activate(ignoringOtherApps: true)
+    if let issue = installationIssue() {
+      view.loadHTMLString("<body style='margin:0;background:#08161b;color:#e8fffb;font:15px -apple-system,system-ui;display:grid;place-items:center;height:100vh'><main style='width:min(580px,86vw);padding:38px;border:1px solid #367875;border-radius:20px;background:#0b252a;box-shadow:0 24px 70px #0008'><div style='color:#42efd7;font:700 11px ui-monospace,monospace;letter-spacing:.15em'>ASV_IDE · INSTALLATION CHECK</div><h1 style='margin:14px 0;font-size:34px;letter-spacing:-.04em'>This copy needs repair.</h1><p style='color:#a9c8c5;line-height:1.55'>\(issue)</p><p style='color:#a9c8c5;line-height:1.55'>Eject the installer, move a fresh AsV_IDE.app into Applications, then reopen it. Your local workspace files are not modified.</p></main></body>", baseURL: nil)
+      return
+    }
     view.loadHTMLString("<body style='margin:0;background:#08161b;color:#7cf8ea;font:13px -apple-system,system-ui;display:grid;place-items:center;height:100vh;letter-spacing:.12em'>STARTING AsV_IDE…</body>", baseURL: nil)
     DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { self.loadWorkspace(in: view) }
   }
   private func loadWorkspace(in view: WKWebView) {
     let url = URL(string: "http://127.0.0.1:3210/")!
     view.load(URLRequest(url: url))
+  }
+  private func installationIssue() -> String? {
+    let resources = Bundle.main.resourceURL
+    guard let icon = resources?.appendingPathComponent("AsV_IDE.icns"), FileManager.default.fileExists(atPath: icon.path) else {
+      return "The application icon resource is missing."
+    }
+    guard let runtime = resources?.appendingPathComponent("runtime"),
+          FileManager.default.fileExists(atPath: runtime.path),
+          FileManager.default.isExecutableFile(atPath: runtime.appendingPathComponent("node").path) else {
+      return "The bundled local runtime is incomplete."
+    }
+    return nil
   }
   func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
   func applicationWillTerminate(_ notification: Notification) { server?.terminate(); localServer.stopAll() }
