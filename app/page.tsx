@@ -945,6 +945,7 @@ function Editor({
   language: string;
   setCode: (code: string) => void;
 }) {
+  const [scrollTop, setScrollTop] = useState(0);
   const setCursor = (area: HTMLTextAreaElement, position: number) =>
     window.requestAnimationFrame(() => {
       area.selectionStart = position;
@@ -990,7 +991,10 @@ function Editor({
   return (
     <>
       <div className="editor-wrap">
-        <ol className="line-numbers">
+        <ol
+          className="line-numbers"
+          style={{ transform: `translateY(-${scrollTop}px)` }}
+        >
           {Array.from(
             { length: Math.max(16, code.split("\n").length) },
             (_, index) => (
@@ -1004,6 +1008,7 @@ function Editor({
           value={code}
           onChange={(event) => setCode(event.target.value)}
           onKeyDown={onKeyDown}
+          onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
         />
       </div>
       <div className="editor-status">

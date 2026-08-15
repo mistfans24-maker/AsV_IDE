@@ -319,6 +319,7 @@ button {
   text-align: right;
   color: #315258;
   user-select: none;
+  will-change: transform;
 }
 .editor-wrap textarea {
   flex: 1;
