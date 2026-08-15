@@ -125,6 +125,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   }
   func applicationDidFinishLaunching(_ notification: Notification) {
     configureMenus()
+    // Old development builds used a different boot asset. Remove only WebKit's
+    // disposable caches and service-worker registrations so an installed update
+    // always loads the bundled workspace, while preserving localStorage projects
+    // and sign-in state.
+    WKWebsiteDataStore.default().removeData(
+      ofTypes: [WKWebsiteDataTypeDiskCache, WKWebsiteDataTypeMemoryCache, WKWebsiteDataTypeServiceWorkerRegistrations],
+      modifiedSince: .distantPast,
+      completionHandler: {}
+    )
     let bundledRuntime = Bundle.main.resourceURL?.appendingPathComponent("runtime")
     let bundledNode = bundledRuntime?.appendingPathComponent("node")
     let bundledServer = bundledRuntime?.appendingPathComponent("node_modules/.bin/vinext")
