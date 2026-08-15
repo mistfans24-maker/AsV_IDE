@@ -28,6 +28,15 @@ open outputs/AsV_IDE.app
 
 The first build needs Xcode Command Line Tools and Node.js. The app stays local to your computer; it is not a cloud IDE.
 
+## Build the macOS installer
+
+```bash
+bash scripts/build-macos-installer.sh
+open outputs/AsV_IDE-Installer.pkg
+```
+
+The installer uses macOS Installer's standard screens and installs AsV_IDE in `/Applications`. It bundles the Node runtime and workspace so it does not depend on a separate project folder; this makes it much larger than the developer DMG. It is unsigned until a Developer ID certificate and notarization are configured.
+
 ## Check before changing code
 
 ```bash

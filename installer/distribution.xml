@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<installer-gui-script minSpecVersion="2">
+  <title>AsV_IDE</title>
+  <options customize="never" require-scripts="false" />
+  <welcome file="welcome.html" />
+  <license file="license.html" />
+  <conclusion file="conclusion.html" />
+  <choices-outline>
+    <line choice="default">
+      <line choice="local.asvide.app" />
+    </line>
+  </choices-outline>
+  <choice id="default" />
+  <choice id="local.asvide.app" title="AsV_IDE" description="Install AsV_IDE in Applications.">
+    <pkg-ref id="local.asvide.app" />
+  </choice>
+  <pkg-ref id="local.asvide.app" version="0.1.0">AsV_IDE.pkg</pkg-ref>
+</installer-gui-script>

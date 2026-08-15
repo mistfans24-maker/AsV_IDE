@@ -125,7 +125,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   }
   func applicationDidFinishLaunching(_ notification: Notification) {
     configureMenus()
-    let task = Process(); task.executableURL = URL(fileURLWithPath: "/usr/bin/env"); task.arguments = ["node", "__PROJECT_ROOT__/node_modules/.bin/vinext", "start", "--port", "3210"]; task.currentDirectoryURL = URL(fileURLWithPath: "__PROJECT_ROOT__"); task.standardOutput = FileHandle.nullDevice; task.standardError = FileHandle.nullDevice; try? task.run(); server = task
+    let bundledRuntime = Bundle.main.resourceURL?.appendingPathComponent("runtime")
+    let bundledNode = bundledRuntime?.appendingPathComponent("node")
+    let bundledServer = bundledRuntime?.appendingPathComponent("node_modules/.bin/vinext")
+    let task = Process()
+    if let bundledRuntime, let bundledNode, let bundledServer, FileManager.default.isExecutableFile(atPath: bundledNode.path), FileManager.default.fileExists(atPath: bundledServer.path) {
+      task.executableURL = bundledNode
+      task.arguments = [bundledServer.path, "start", "--port", "3210"]
+      task.currentDirectoryURL = bundledRuntime
+    } else {
+      task.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+      task.arguments = ["node", "__PROJECT_ROOT__/node_modules/.bin/vinext", "start", "--port", "3210"]
+      task.currentDirectoryURL = URL(fileURLWithPath: "__PROJECT_ROOT__")
+    }
+    task.standardOutput = FileHandle.nullDevice; task.standardError = FileHandle.nullDevice; try? task.run(); server = task
     let content = WKUserContentController(); content.add(bridge, name: "asvVault"); content.add(executor, name: "asvExecute"); content.add(localServer, name: "asvServer")
     content.addUserScript(WKUserScript(source: "window.asvVault={save:(provider,key)=>window.webkit.messageHandlers.asvVault.postMessage({provider:provider,key:key})};window.asvExecutor={run:(language,code)=>window.webkit.messageHandlers.asvExecute.postMessage({language:language,code:code})};window.asvServer={start:(language,code,port)=>window.webkit.messageHandlers.asvServer.postMessage({language:language,code:code,port:port})};", injectionTime: .atDocumentStart, forMainFrameOnly: true))
     let config = WKWebViewConfiguration(); config.userContentController = content
