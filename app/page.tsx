@@ -191,6 +191,7 @@ export default function Home() {
   const [hiring, setHiring] = useState(
     "Join our Discord — we are hiring developers, hardware builders, and plugin creators.",
   );
+  const [updateHint, setUpdateHint] = useState<UpdateInfo | null>(null);
   const [loaded, setLoaded] = useState(false);
   useEffect(() => {
     const timer = window.setTimeout(() => setBooting(false), 600);
@@ -210,6 +211,19 @@ export default function Home() {
     }
     setLoaded(true);
     return () => window.clearTimeout(timer);
+  }, []);
+  useEffect(() => {
+    const checkRelease = async () => {
+      try {
+        const response = await fetch(`${API_ORIGIN}/v1/updates?current=${APP_VERSION}`);
+        if (!response.ok) return;
+        const result = (await response.json()) as UpdateInfo;
+        if (result.updateAvailable) setUpdateHint(result);
+      } catch {
+        // Update checks are optional: the IDE remains entirely usable offline.
+      }
+    };
+    void checkRelease();
   }, []);
   useEffect(() => {
     const query = new URLSearchParams(window.location.search);
@@ -268,6 +282,17 @@ export default function Home() {
       writeTerminal((event as CustomEvent<string>).detail);
     window.addEventListener("asv-execute-output", receive);
     return () => window.removeEventListener("asv-execute-output", receive);
+  }, []);
+  useEffect(() => {
+    const receive = (event: Event) =>
+      writeTerminal((event as CustomEvent<string>).detail);
+    window.addEventListener("asv-server-output", receive);
+    return () => window.removeEventListener("asv-server-output", receive);
+  }, []);
+  useEffect(() => {
+    const save = () => writeTerminal("Saved locally. Your workspace will be restored when AsV_IDE reopens.");
+    window.addEventListener("asv-save", save);
+    return () => window.removeEventListener("asv-save", save);
   }, []);
   const createProject = (name: string, language: string) => {
     const cleanName =
@@ -399,6 +424,38 @@ export default function Home() {
     writeTerminal(`Running ${project.language} locally…`);
     runner.run(project.language, project.code);
   };
+  const hostLocalProject = () => {
+    if (!new Set(["Python", "JavaScript"]).has(project.language)) {
+      writeTerminal(
+        "Local hosting is available for Python and JavaScript projects that start their own server. Select one of those templates, then make the code listen on port 4173.",
+      );
+      return;
+    }
+    const server = (
+      window as Window & {
+        asvServer?: {
+          start: (language: string, code: string, port: string) => void;
+          stop: () => void;
+        };
+      }
+    ).asvServer;
+    if (!server) {
+      writeTerminal("Open the macOS AsV_IDE app to host a local project.");
+      return;
+    }
+    writeTerminal("Starting local server on http://localhost:4173…");
+    server.start(project.language, project.code, "4173");
+  };
+  const stopLocalProject = () => {
+    const server = (
+      window as Window & { asvServer?: { stop: () => void } }
+    ).asvServer;
+    if (!server) {
+      writeTerminal("Open the macOS AsV_IDE app to stop a local server.");
+      return;
+    }
+    server.stop();
+  };
   if (booting)
     return (
       <main className="boot-screen">
@@ -465,6 +522,17 @@ export default function Home() {
           <button className="visual-button" onClick={() => setNotebook(true)}>
             <Icon name="Notebook" /> New notebook
           </button>
+          <button className="visual-button" onClick={hostLocalProject}>
+            ◉ Host local
+          </button>
+          <button className="visual-button" onClick={stopLocalProject}>
+            Stop host
+          </button>
+          {updateHint?.updateAvailable && (
+            <button className="visual-button update-hint" onClick={() => setSettingsOpen(true)}>
+              Update {updateHint.latest}
+            </button>
+          )}
           <button className="run-button" onClick={run}>
             ▶ Run
           </button>
@@ -511,6 +579,8 @@ export default function Home() {
             about={about}
             hiring={hiring}
             adminMode={adminMode}
+            onNotify={writeTerminal}
+            onSettings={() => setSettingsOpen(true)}
           />
           <div className="side-bottom">
             <span>◉ Local-first</span>
@@ -816,6 +886,8 @@ function Sidebar({
   about,
   hiring,
   adminMode,
+  onNotify,
+  onSettings,
 }: {
   active: string;
   project: Project;
@@ -828,6 +900,8 @@ function Sidebar({
   about: string;
   hiring: string;
   adminMode: boolean;
+  onNotify: (message: string) => void;
+  onSettings: () => void;
 }) {
   const [query, setQuery] = useState("");
   const matches = files.filter(
@@ -906,7 +980,10 @@ function Sidebar({
           Workspace changes are autosaved locally. Push changes from your Git
           workflow when you are ready to share them.
         </small>
-        <button onClick={() => navigator.clipboard?.writeText("git status")}>
+        <button onClick={() => {
+          navigator.clipboard?.writeText("git status");
+          onNotify("Copied `git status` to your clipboard. Run it in Terminal inside your project folder.");
+        }}>
           Copy git status command
         </button>
       </div>
@@ -919,6 +996,7 @@ function Sidebar({
           ✦ Explore project tools
         </button>
         <button onClick={() => openFile(mainFile)}>◉ Open main code</button>
+        <button onClick={onSettings}>Configure AI providers</button>
         <small>
           AI integrations stay optional until you configure a provider.
         </small>
@@ -950,9 +1028,10 @@ function Sidebar({
     <div className="sidebar-message">
       <b>Device Center</b>
       <small>
-        Attach an ESP32 by USB or Bluetooth to flash and view serial data.
+        Device flashing needs a board transport; it is not bundled into this
+        early local build yet.
       </small>
-      <button>Connect a board</button>
+      <button onClick={() => onNotify("Device support is planned for the native build. For now, use Arduino IDE, esptool, or a configured local toolchain to flash a board.")}>Device support info</button>
     </div>
   );
 }
@@ -1068,6 +1147,11 @@ function Editor({
     });
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     const area = event.currentTarget;
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
+      event.preventDefault();
+      window.dispatchEvent(new Event("asv-save"));
+      return;
+    }
     const start = area.selectionStart;
     const end = area.selectionEnd;
     const before = code.slice(0, start);
@@ -1483,6 +1567,24 @@ function Notebook({ theme, onBack }: { theme: string; onBack: () => void }) {
     setCells((current) => current.map((item) => item.id === cell.id ? { ...item, output: `Running ${language} locally…` } : item));
     runner.run(language, cell.source);
   };
+  const codeCellKeyDown = (cell: NotebookCell, event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key !== "Enter" && event.key !== "Tab") return;
+    const area = event.currentTarget;
+    const start = area.selectionStart;
+    const end = area.selectionEnd;
+    const before = cell.source.slice(0, start);
+    const after = cell.source.slice(end);
+    event.preventDefault();
+    if (event.key === "Tab") {
+      updateCell(cell.id, `${before}  ${after}`);
+      window.requestAnimationFrame(() => { area.selectionStart = start + 2; area.selectionEnd = start + 2; });
+      return;
+    }
+    const line = before.slice(before.lastIndexOf("\n") + 1);
+    const indent = (line.match(/^\s*/)?.[0] || "") + (line.trimEnd().endsWith(":") ? "  " : "");
+    updateCell(cell.id, `${before}\n${indent}${after}`);
+    window.requestAnimationFrame(() => { area.selectionStart = start + indent.length + 1; area.selectionEnd = start + indent.length + 1; });
+  };
   return (
     <main className={`notebook theme-${theme}`}>
       <header className="notebook-top">
@@ -1497,6 +1599,7 @@ function Notebook({ theme, onBack }: { theme: string; onBack: () => void }) {
           <span>● Saved locally</span>
           <button className="visual-button" onClick={() => setCells((current) => [...current, newNotebookCell("code")])}>＋ Code</button>
           <button className="visual-button" onClick={() => setCells((current) => [...current, newNotebookCell("text")])}>＋ Text</button>
+          <button className="visual-button" onClick={() => setCells((current) => current.map((cell) => ({ ...cell, output: "" })))}>Clear output</button>
           <button className="visual-button" onClick={onBack}>← IDE</button>
         </div>
       </header>
@@ -1512,7 +1615,7 @@ function Notebook({ theme, onBack }: { theme: string; onBack: () => void }) {
         </div>
         {cells.map((cell, index) => <article className={`note-cell ${cell.type === "code" ? "code-cell" : "text-cell"}`} key={cell.id}>
           <div className="cell-head"><span>{cell.type === "code" ? "⌘ CODE" : "T TEXT"} · CELL {index + 1}</span>{cell.type === "code" && <button className="cell-play" onClick={() => runCell(cell)} aria-label={`Run cell ${index + 1}`}>▶ Run</button>}<button className="cell-remove" onClick={() => setCells((current) => current.length === 1 ? current : current.filter((item) => item.id !== cell.id))} aria-label={`Remove cell ${index + 1}`}>×</button></div>
-          <textarea aria-label={`${cell.type} cell ${index + 1}`} spellCheck={cell.type !== "code"} value={cell.source} onChange={(event) => updateCell(cell.id, event.target.value)} />
+          <textarea aria-label={`${cell.type} cell ${index + 1}`} spellCheck={cell.type !== "code"} value={cell.source} onChange={(event) => updateCell(cell.id, event.target.value)} onKeyDown={cell.type === "code" ? (event) => codeCellKeyDown(cell, event) : undefined} />
           {cell.type === "code" && <pre>{cell.output || "Run this cell to see local output."}</pre>}
           <div className="cell-add-row"><button onClick={() => setCells((current) => { const at = current.findIndex((item) => item.id === cell.id); return [...current.slice(0, at + 1), newNotebookCell("code"), ...current.slice(at + 1)]; })}>＋ Code</button><button onClick={() => setCells((current) => { const at = current.findIndex((item) => item.id === cell.id); return [...current.slice(0, at + 1), newNotebookCell("text"), ...current.slice(at + 1)]; })}>＋ Text</button></div>
         </article>)}

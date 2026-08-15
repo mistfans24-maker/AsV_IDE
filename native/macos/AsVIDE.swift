@@ -72,7 +72,9 @@ final class ServerBridge: NSObject, WKScriptMessageHandler {
   weak var webView: WKWebView?
   private var servers: [Process] = []
   func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
-    guard message.name == "asvServer", let payload = message.body as? [String: String], let language = payload["language"], let code = payload["code"], let port = payload["port"], let command = ["Python": ("python3", "py"), "JavaScript": ("node", "js")][language] else { publish("Only Python and JavaScript localhost cells are supported."); return }
+    guard message.name == "asvServer", let payload = message.body as? [String: String] else { return }
+    if payload["action"] == "stop" { stopAll(); publish("Stopped local server processes."); return }
+    guard let language = payload["language"], let code = payload["code"], let port = payload["port"], let command = ["Python": ("python3", "py"), "JavaScript": ("node", "js")][language] else { publish("Only Python and JavaScript localhost projects are supported."); return }
     let file = FileManager.default.temporaryDirectory.appendingPathComponent("asv-server-\(UUID().uuidString).\(command.1)")
     do {
       try code.write(to: file, atomically: true, encoding: .utf8)
@@ -129,6 +131,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   private var server: Process?
   private var mainWindow: NSWindow?
   private let bridge = VaultBridge()
+  private let media = MediaBridge()
   private let executor = ExecutorBridge()
   private let localServer = ServerBridge()
   private let startupNavigation = StartupNavigation()
@@ -179,11 +182,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       task.currentDirectoryURL = URL(fileURLWithPath: "__PROJECT_ROOT__")
     }
     task.standardOutput = FileHandle.nullDevice; task.standardError = FileHandle.nullDevice; try? task.run(); server = task
-    let content = WKUserContentController(); content.add(bridge, name: "asvVault"); content.add(executor, name: "asvExecute"); content.add(localServer, name: "asvServer")
-    content.addUserScript(WKUserScript(source: "window.asvVault={save:(provider,key)=>window.webkit.messageHandlers.asvVault.postMessage({provider:provider,key:key})};window.asvExecutor={run:(language,code)=>window.webkit.messageHandlers.asvExecute.postMessage({language:language,code:code})};window.asvServer={start:(language,code,port)=>window.webkit.messageHandlers.asvServer.postMessage({language:language,code:code,port:port})};", injectionTime: .atDocumentStart, forMainFrameOnly: true))
+    let content = WKUserContentController(); content.add(bridge, name: "asvVault"); content.add(media, name: "asvMedia"); content.add(executor, name: "asvExecute"); content.add(localServer, name: "asvServer")
+    content.addUserScript(WKUserScript(source: "window.asvVault={save:(provider,key)=>window.webkit.messageHandlers.asvVault.postMessage({provider:provider,key:key})};window.asvMedia={control:(action)=>window.webkit.messageHandlers.asvMedia.postMessage({action:action})};window.asvExecutor={run:(language,code)=>window.webkit.messageHandlers.asvExecute.postMessage({language:language,code:code})};window.asvServer={start:(language,code,port)=>window.webkit.messageHandlers.asvServer.postMessage({language:language,code:code,port:port}),stop:()=>window.webkit.messageHandlers.asvServer.postMessage({action:'stop'})};", injectionTime: .atDocumentStart, forMainFrameOnly: true))
     let config = WKWebViewConfiguration(); config.userContentController = content
     let view = WKWebView(frame: NSRect(x: 0, y: 0, width: 1280, height: 800), configuration: config)
     view.navigationDelegate = startupNavigation
+    media.webView = view
     executor.webView = view
     localServer.webView = view
     let window = NSWindow(contentRect: view.frame, styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
