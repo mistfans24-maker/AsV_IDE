@@ -4,6 +4,15 @@
 import { useEffect, useState, type KeyboardEvent } from "react";
 
 const API_ORIGIN = "https://asv-ide-api.mist-fans24.workers.dev";
+const APP_VERSION = "0.1.0";
+
+type UpdateInfo = {
+  latest: string;
+  updateAvailable: boolean;
+  downloadUrl?: string;
+  notesUrl?: string;
+  message?: string;
+};
 
 const templates: Record<string, string> = {
   "Arduino C++": `#include <Arduino.h>
@@ -1059,16 +1068,6 @@ function Login({
   onDiscord: () => void;
   onGoogle: () => void;
 }) {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [message, setMessage] = useState(
-    "Choose a provider or connect an Admin server.",
-  );
-  const submit = () => {
-    setMessage(
-      "Admin sign-in is disabled until a server-side authentication provider is configured. Passwords are never stored in this app.",
-    );
-  };
   return (
     <div className="modal-back">
       <section className="modal login-modal">
@@ -1098,35 +1097,19 @@ function Login({
           </section>
           <section>
             <b>GitHub</b>
-            <small>Connect a GitHub account for repository sync.</small>
-            <button
-              onClick={() =>
-                setMessage(
-                  "GitHub sign-in needs your OAuth client ID before it can be connected.",
-                )
-              }
-            >
-              Continue with GitHub
-            </button>
+            <small>Repository sync is coming after its OAuth client is configured.</small>
+            <button disabled aria-disabled="true">GitHub coming soon</button>
           </section>
         </div>
-        <div className="admin-login">
-          <b>Admin access</b>
-          <input
-            value={username}
-            onChange={(event) => setUsername(event.target.value)}
-            placeholder="Username"
-          />
-          <input
-            type="password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            placeholder="Password"
-          />
-          <button className="primary" onClick={submit}>
-            Sign in securely
-          </button>
-          <small>{message}</small>
+        <div className="login-trust">
+          <span aria-hidden="true">◇</span>
+          <div>
+            <b>Private by design</b>
+            <small>
+              AsV_IDE never collects your provider password. Sign-in is handled
+              by Google or Discord and your session is protected by the API.
+            </small>
+          </div>
         </div>
       </section>
     </div>
@@ -1178,6 +1161,8 @@ function Settings({
   setTheme: (theme: string) => void;
   onClose: () => void;
 }) {
+  const [update, setUpdate] = useState<UpdateInfo | null>(null);
+  const [updateStatus, setUpdateStatus] = useState("Checking the stable release channel…");
   const [mediaStatus, setMediaStatus] = useState(
     "Control Apple Music without connecting a streaming account.",
   );
@@ -1187,6 +1172,19 @@ function Settings({
     window.addEventListener("asv-media-output", receive);
     return () => window.removeEventListener("asv-media-output", receive);
   }, []);
+  const checkForUpdates = async () => {
+    setUpdateStatus("Checking the stable release channel…");
+    try {
+      const response = await fetch(`${API_ORIGIN}/v1/updates?current=${APP_VERSION}`);
+      if (!response.ok) throw new Error("Update service unavailable");
+      const result = (await response.json()) as UpdateInfo;
+      setUpdate(result);
+      setUpdateStatus(result.updateAvailable ? `Version ${result.latest} is ready.` : `You are up to date on ${APP_VERSION}.`);
+    } catch {
+      setUpdateStatus("Could not check for updates. Your workspace is still usable offline.");
+    }
+  };
+  useEffect(() => { void checkForUpdates(); }, []);
   const controlMedia = (action: "previous" | "playPause" | "next") => {
     const bridge = (
       window as Window & { asvMedia?: { control: (value: string) => void } }
@@ -1210,6 +1208,9 @@ function Settings({
           Changes save locally and apply across the editor, welcome screen, and
           notebook.
         </p>
+        <div className="settings-summary" aria-label="Workspace status">
+          <span>● Local-first</span><span>● Autosave on</span><span>v{APP_VERSION}</span>
+        </div>
         <h3>Theme</h3>
         <div className="visual-grid">
           {themes.map((item) => (
@@ -1222,6 +1223,20 @@ function Settings({
               <b>{item}</b>
             </button>
           ))}
+        </div>
+        <h3>Updates</h3>
+        <div className="update-card">
+          <div>
+            <b>{update?.updateAvailable ? `Update available: ${update.latest}` : "Stable release channel"}</b>
+            <small>{updateStatus}</small>
+          </div>
+          <div className="update-actions">
+            <button onClick={() => void checkForUpdates()}>Check now</button>
+            {update?.updateAvailable && update.downloadUrl && (
+              <button className="primary" onClick={() => window.open(update.downloadUrl, "_blank", "noopener,noreferrer")}>Download update</button>
+            )}
+          </div>
+          <small className="update-note">Updates download from the official release page. Automatic in-place installation will be enabled once the macOS app is signed and notarized.</small>
         </div>
         <h3>Mac media controls</h3>
         <div className="spotify-connect media-controls-panel">
