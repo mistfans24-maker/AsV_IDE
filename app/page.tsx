@@ -551,7 +551,13 @@ export default function Home() {
           onClose={() => setSettingsOpen(false)}
         />
       )}
-      {loginOpen && <Login onClose={() => setLoginOpen(false)} onDiscord={() => { window.location.assign(`${API_ORIGIN}/auth/discord/start`); }} />}
+      {loginOpen && (
+        <Login
+          onClose={() => setLoginOpen(false)}
+          onDiscord={() => window.location.assign(`${API_ORIGIN}/auth/discord/start`)}
+          onGoogle={() => window.location.assign(`${API_ORIGIN}/auth/google/start`)}
+        />
+      )}
     </main>
   );
 }
@@ -1044,7 +1050,15 @@ function Editor({
     </>
   );
 }
-function Login({ onClose, onDiscord }: { onClose: () => void; onDiscord: () => void }) {
+function Login({
+  onClose,
+  onDiscord,
+  onGoogle,
+}: {
+  onClose: () => void;
+  onDiscord: () => void;
+  onGoogle: () => void;
+}) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState(
@@ -1077,14 +1091,8 @@ function Login({ onClose, onDiscord }: { onClose: () => void; onDiscord: () => v
           </section>
           <section>
             <b>Google</b>
-            <small>Continue with Google after OAuth is configured.</small>
-            <button
-              onClick={() =>
-                setMessage(
-                  "Google sign-in needs your OAuth client ID before it can be connected.",
-                )
-              }
-            >
+            <small>Sign in with your Google name and profile photo.</small>
+            <button className="primary" onClick={onGoogle}>
               Continue with Google
             </button>
           </section>
