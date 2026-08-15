@@ -101,7 +101,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   private let executor = ExecutorBridge()
   private let localServer = ServerBridge()
   private let startupNavigation = StartupNavigation()
+  private func configureMenus() {
+    let mainMenu = NSMenu()
+    let applicationItem = NSMenuItem()
+    let applicationMenu = NSMenu(title: "AsV_IDE")
+    applicationMenu.addItem(withTitle: "Quit AsV_IDE", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+    applicationItem.submenu = applicationMenu
+    mainMenu.addItem(applicationItem)
+    let editItem = NSMenuItem()
+    let editMenu = NSMenu(title: "Edit")
+    editMenu.addItem(withTitle: "Cut", action: Selector(("cut:")), keyEquivalent: "x")
+    editMenu.addItem(withTitle: "Copy", action: Selector(("copy:")), keyEquivalent: "c")
+    editMenu.addItem(withTitle: "Paste", action: Selector(("paste:")), keyEquivalent: "v")
+    editMenu.addItem(withTitle: "Select All", action: Selector(("selectAll:")), keyEquivalent: "a")
+    editItem.submenu = editMenu
+    mainMenu.addItem(editItem)
+    let windowItem = NSMenuItem()
+    let windowMenu = NSMenu(title: "Window")
+    windowMenu.addItem(withTitle: "Close Window", action: Selector(("performClose:")), keyEquivalent: "w")
+    windowItem.submenu = windowMenu
+    mainMenu.addItem(windowItem)
+    NSApp.mainMenu = mainMenu
+  }
   func applicationDidFinishLaunching(_ notification: Notification) {
+    configureMenus()
     let task = Process(); task.executableURL = URL(fileURLWithPath: "/usr/bin/env"); task.arguments = ["node", "__PROJECT_ROOT__/node_modules/.bin/vinext", "start", "--port", "3210"]; task.currentDirectoryURL = URL(fileURLWithPath: "__PROJECT_ROOT__"); task.standardOutput = FileHandle.nullDevice; task.standardError = FileHandle.nullDevice; try? task.run(); server = task
     let content = WKUserContentController(); content.add(bridge, name: "asvVault"); content.add(executor, name: "asvExecute"); content.add(localServer, name: "asvServer")
     content.addUserScript(WKUserScript(source: "window.asvVault={save:(provider,key)=>window.webkit.messageHandlers.asvVault.postMessage({provider:provider,key:key})};window.asvExecutor={run:(language,code)=>window.webkit.messageHandlers.asvExecute.postMessage({language:language,code:code})};window.asvServer={start:(language,code,port)=>window.webkit.messageHandlers.asvServer.postMessage({language:language,code:code,port:port})};", injectionTime: .atDocumentStart, forMainFrameOnly: true))
