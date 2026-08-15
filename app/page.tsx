@@ -294,6 +294,37 @@ export default function Home() {
     window.addEventListener("asv-save", save);
     return () => window.removeEventListener("asv-save", save);
   }, []);
+  useEffect(() => {
+    const receiveImport = (event: Event) => {
+      try {
+        const archive = JSON.parse((event as CustomEvent<string>).detail) as {
+          format?: string;
+          project?: Project;
+        };
+        if (
+          archive.format !== "asv-ide-project" ||
+          !archive.project?.name ||
+          !archive.project?.language
+        ) {
+          throw new Error("invalid project");
+        }
+        setProject({ ...archive.project, files: archive.project.files || {} });
+        setFile("README.md");
+        setWelcome(false);
+        writeTerminal(`Imported ${archive.project.name} locally.`);
+      } catch {
+        writeTerminal("That file is not a valid AsV_IDE project export.");
+      }
+    };
+    const receiveImportError = (event: Event) =>
+      writeTerminal((event as CustomEvent<string>).detail);
+    window.addEventListener("asv-project-import", receiveImport);
+    window.addEventListener("asv-project-import-error", receiveImportError);
+    return () => {
+      window.removeEventListener("asv-project-import", receiveImport);
+      window.removeEventListener("asv-project-import-error", receiveImportError);
+    };
+  }, []);
   const createProject = (name: string, language: string) => {
     const cleanName =
       name.trim().replace(/[^a-zA-Z0-9._-]/g, "-") || "new-project";
@@ -355,6 +386,16 @@ export default function Home() {
   };
   const exportProject = () => {
     const archive = JSON.stringify({ format: "asv-ide-project", version: 1, project }, null, 2);
+    const nativeProject = (
+      window as Window & {
+        asvProject?: { export: (name: string, archive: string) => void };
+      }
+    ).asvProject;
+    if (nativeProject) {
+      nativeProject.export(project.name || "asv-project", archive);
+      writeTerminal(`Choose a destination to export ${project.name} as a portable project.`);
+      return;
+    }
     const url = URL.createObjectURL(new Blob([archive], { type: "application/json" }));
     const link = document.createElement("a");
     link.href = url;
@@ -385,6 +426,16 @@ export default function Home() {
       }
     };
     reader.readAsText(selected);
+  };
+  const chooseImport = () => {
+    const nativeProject = (
+      window as Window & { asvProject?: { import: () => void } }
+    ).asvProject;
+    if (nativeProject) {
+      nativeProject.import();
+      return;
+    }
+    importInput.current?.click();
   };
   const run = () => {
     const isMicroPython =
@@ -510,7 +561,7 @@ export default function Home() {
         </div>
         <div className="top-actions">
           <input ref={importInput} className="hidden-file-input" type="file" accept=".json,.asv-project,.apk,application/json,application/vnd.android.package-archive" onChange={importProject} />
-          <button className="visual-button" onClick={() => importInput.current?.click()}>Import</button>
+          <button className="visual-button" onClick={chooseImport}>Import</button>
           <button className="visual-button" onClick={exportProject}>Export</button>
           <button className="visual-button" onClick={() => setWelcome(true)}>
             ＋ Project

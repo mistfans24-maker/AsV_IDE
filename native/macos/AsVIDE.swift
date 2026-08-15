@@ -96,6 +96,53 @@ final class ServerBridge: NSObject, WKScriptMessageHandler {
   private func publish(_ output: String) { let json = (try? JSONEncoder().encode(output)).flatMap { String(data: $0, encoding: .utf8) } ?? "\"Output unavailable\""; webView?.evaluateJavaScript("window.dispatchEvent(new CustomEvent('asv-server-output',{detail:\(json)}));") }
 }
 
+final class ProjectBridge: NSObject, WKScriptMessageHandler {
+  weak var webView: WKWebView?
+  func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+    guard message.name == "asvProject", let payload = message.body as? [String: String], let action = payload["action"] else { return }
+    if action == "import" { openProject(); return }
+    guard action == "export", let archive = payload["archive"] else { return }
+    saveProject(named: payload["name"] ?? "asv-project", archive: archive)
+  }
+  private func openProject() {
+    DispatchQueue.main.async { [weak self] in
+      let panel = NSOpenPanel()
+      panel.title = "Import AsV_IDE project"
+      panel.message = "Choose an .asv-project.json export created by AsV_IDE."
+      panel.allowedContentTypes = [.json]
+      panel.allowsMultipleSelection = false
+      panel.canChooseDirectories = false
+      guard panel.runModal() == .OK, let url = panel.url else { return }
+      do {
+        let archive = try String(contentsOf: url, encoding: .utf8)
+        self?.publish("asv-project-import", archive)
+      } catch {
+        self?.publish("asv-project-import-error", "Could not read the selected project: \(error.localizedDescription)")
+      }
+    }
+  }
+  private func saveProject(named name: String, archive: String) {
+    DispatchQueue.main.async { [weak self] in
+      let panel = NSSavePanel()
+      panel.title = "Export AsV_IDE project"
+      panel.message = "Save a portable project archive you can import on another Mac."
+      panel.nameFieldStringValue = "\(name).asv-project.json"
+      panel.allowedContentTypes = [.json]
+      guard panel.runModal() == .OK, let url = panel.url else { return }
+      do {
+        try archive.write(to: url, atomically: true, encoding: .utf8)
+        self?.publish("asv-project-import-error", "Exported \(name) to \(url.path).")
+      } catch {
+        self?.publish("asv-project-import-error", "Could not export project: \(error.localizedDescription)")
+      }
+    }
+  }
+  private func publish(_ event: String, _ value: String) {
+    let json = (try? JSONEncoder().encode(value)).flatMap { String(data: $0, encoding: .utf8) } ?? "\"Project action unavailable\""
+    DispatchQueue.main.async { self.webView?.evaluateJavaScript("window.dispatchEvent(new CustomEvent('\\(event)',{detail:\(json)}));") }
+  }
+}
+
 final class StartupNavigation: NSObject, WKNavigationDelegate {
   private var attempts = 0
   func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { attempts = 0 }
@@ -134,6 +181,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   private let media = MediaBridge()
   private let executor = ExecutorBridge()
   private let localServer = ServerBridge()
+  private let projectBridge = ProjectBridge()
   private let startupNavigation = StartupNavigation()
   private func configureMenus() {
     let mainMenu = NSMenu()
@@ -182,14 +230,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       task.currentDirectoryURL = URL(fileURLWithPath: "__PROJECT_ROOT__")
     }
     task.standardOutput = FileHandle.nullDevice; task.standardError = FileHandle.nullDevice; try? task.run(); server = task
-    let content = WKUserContentController(); content.add(bridge, name: "asvVault"); content.add(media, name: "asvMedia"); content.add(executor, name: "asvExecute"); content.add(localServer, name: "asvServer")
-    content.addUserScript(WKUserScript(source: "window.asvVault={save:(provider,key)=>window.webkit.messageHandlers.asvVault.postMessage({provider:provider,key:key})};window.asvMedia={control:(action)=>window.webkit.messageHandlers.asvMedia.postMessage({action:action})};window.asvExecutor={run:(language,code)=>window.webkit.messageHandlers.asvExecute.postMessage({language:language,code:code})};window.asvServer={start:(language,code,port)=>window.webkit.messageHandlers.asvServer.postMessage({language:language,code:code,port:port}),stop:()=>window.webkit.messageHandlers.asvServer.postMessage({action:'stop'})};", injectionTime: .atDocumentStart, forMainFrameOnly: true))
+    let content = WKUserContentController(); content.add(bridge, name: "asvVault"); content.add(media, name: "asvMedia"); content.add(executor, name: "asvExecute"); content.add(localServer, name: "asvServer"); content.add(projectBridge, name: "asvProject")
+    content.addUserScript(WKUserScript(source: "window.asvVault={save:(provider,key)=>window.webkit.messageHandlers.asvVault.postMessage({provider:provider,key:key})};window.asvMedia={control:(action)=>window.webkit.messageHandlers.asvMedia.postMessage({action:action})};window.asvExecutor={run:(language,code)=>window.webkit.messageHandlers.asvExecute.postMessage({language:language,code:code})};window.asvServer={start:(language,code,port)=>window.webkit.messageHandlers.asvServer.postMessage({language:language,code:code,port:port}),stop:()=>window.webkit.messageHandlers.asvServer.postMessage({action:'stop'})};window.asvProject={import:()=>window.webkit.messageHandlers.asvProject.postMessage({action:'import'}),export:(name,archive)=>window.webkit.messageHandlers.asvProject.postMessage({action:'export',name:name,archive:archive})};", injectionTime: .atDocumentStart, forMainFrameOnly: true))
     let config = WKWebViewConfiguration(); config.userContentController = content
     let view = WKWebView(frame: NSRect(x: 0, y: 0, width: 1280, height: 800), configuration: config)
     view.navigationDelegate = startupNavigation
     media.webView = view
     executor.webView = view
     localServer.webView = view
+    projectBridge.webView = view
     let window = NSWindow(contentRect: view.frame, styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
     window.title = "AsV_IDE"; window.center(); window.contentView = view; window.makeKeyAndOrderFront(nil)
     mainWindow = window
