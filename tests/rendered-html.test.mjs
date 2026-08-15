@@ -31,3 +31,13 @@ test("ships the public maker experience instead of starter scaffolding", async (
   assert.match(layout, /AsV_IDE — Build without limits/);
   assert.doesNotMatch(page, /SkeletonPreview|codex-preview/);
 });
+
+test("keeps broad language starters and local notebook safety visible", async () => {
+  const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  for (const language of ["TypeScript", "Rust", "Go", "Swift", "Kotlin", "MicroPython", "SQL", "YAML"]) {
+    assert.match(page, new RegExp(`${language.replace(/[+]/g, "\\\\+")}:`));
+  }
+  assert.match(page, /LOCAL NOTEBOOK · AUTOSAVED/);
+  assert.match(page, /local compiler\/runtime, which is not bundled yet/);
+  assert.match(page, /asv-ide-notebook/);
+});
