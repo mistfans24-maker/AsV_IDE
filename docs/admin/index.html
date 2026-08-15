@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex,nofollow" />
+    <title>AsV_IDE · Control room</title>
+    <style>
+      :root { color-scheme: dark; --bg:#061315; --panel:#0b2529; --line:#28585c; --mint:#40efd6; --text:#e4fffb; --muted:#8eb4b2; --danger:#ff8d8d; }
+      * { box-sizing:border-box; } body { margin:0; min-height:100vh; color:var(--text); background:radial-gradient(circle at 80% 0,#17626155,transparent 32%),var(--bg); font:15px Inter,ui-sans-serif,system-ui,sans-serif; }
+      main { width:min(900px,calc(100% - 32px)); margin:0 auto; padding:44px 0 80px; } nav { display:flex; justify-content:space-between; align-items:center; margin-bottom:55px; } a { color:var(--mint); } .eyebrow { color:var(--mint); font:700 11px ui-monospace,monospace; letter-spacing:.15em; } h1 { margin:12px 0 8px; font-size:clamp(38px,6vw,62px); letter-spacing:-.06em; } p { color:var(--muted); line-height:1.6; } .grid { display:grid; grid-template-columns:repeat(2,1fr); gap:15px; margin:30px 0; } .card { padding:22px; border:1px solid var(--line); border-radius:16px; background:#092125cc; } .metric { display:block; margin-top:13px; color:var(--mint); font-size:35px; font-weight:850; letter-spacing:-.06em; } label { display:block; margin-top:22px; color:#bce2df; font-weight:700; } input { width:100%; margin-top:8px; padding:13px; border:1px solid var(--line); border-radius:9px; color:var(--text); background:#061a1e; font:inherit; } .switch { display:flex; align-items:center; justify-content:space-between; gap:18px; margin-top:25px; padding:17px; border-radius:12px; background:#103438; } button { border:0; border-radius:9px; padding:13px 16px; color:#042022; background:var(--mint); font:800 14px inherit; cursor:pointer; } button.secondary { color:var(--text); background:#183b3e; } .actions { display:flex; gap:10px; margin-top:22px; } .status { min-height:24px; margin-top:18px; color:var(--muted); } .status.error { color:var(--danger); } [hidden] { display:none!important; } @media(max-width:620px){.grid{grid-template-columns:1fr}nav{margin-bottom:35px}}
+    </style>
+  </head>
+  <body>
+    <main>
+      <nav><strong>AV&nbsp; AsV_IDE</strong><a href="../">← Public site</a></nav>
+      <div class="eyebrow">PRIVATE CONTROL ROOM</div>
+      <h1>Keep the release in your hands.</h1>
+      <p>Manage availability and the community link. Changes take effect immediately through the API.</p>
+      <section id="login" class="card"><h2>Administrator sign-in</h2><p>Use the Discord account approved for this project.</p><button id="signIn">Continue with Discord</button></section>
+      <section id="dashboard" hidden>
+        <div class="grid"><div class="card"><span>DOWNLOAD REQUESTS</span><b id="total" class="metric">—</b><small>all time</small></div><div class="card"><span>LAST 7 DAYS</span><b id="week" class="metric">—</b><small>requested through official download link</small></div></div>
+        <section class="card"><h2>Release controls</h2><p>Pausing downloads makes the official download route return a clear maintenance response instead of a file.</p><div class="switch"><div><b>Downloads available</b><p id="availability">Loading…</p></div><input id="downloads" type="checkbox" aria-label="Enable downloads" /></div><label for="discord">Discord invite URL</label><input id="discord" type="url" placeholder="https://discord.gg/your-server" /><div class="actions"><button id="save">Save changes</button><button id="refresh" class="secondary">Refresh</button></div><p id="status" class="status" aria-live="polite"></p></section>
+      </section>
+    </main>
+    <script>
+      const api = 'https://asv-ide-api.mist-fans24.workers.dev';
+      const $ = (id) => document.getElementById(id);
+      async function load() {
+        $('status').textContent = 'Loading controls…'; $('status').className = 'status';
+        const response = await fetch(api + '/v1/admin/config', { credentials:'include' });
+        if (response.status === 403) { $('login').hidden = false; $('dashboard').hidden = true; return; }
+        if (!response.ok) throw new Error('Could not load the dashboard.');
+        const data = await response.json(); $('login').hidden = true; $('dashboard').hidden = false;
+        $('total').textContent = data.stats.downloadsTotal; $('week').textContent = data.stats.downloadsLast7Days;
+        $('downloads').checked = data.config.downloadsEnabled; $('discord').value = data.config.discordUrl;
+        $('availability').textContent = data.config.downloadsEnabled ? 'Public downloads are live.' : 'Downloads are paused.';
+        $('status').textContent = 'Dashboard up to date.';
+      }
+      $('signIn').onclick = () => location.href = api + '/auth/discord/start';
+      $('refresh').onclick = () => load().catch(showError);
+      $('save').onclick = async () => { try { $('status').textContent = 'Saving…'; const response = await fetch(api + '/v1/admin/config', { method:'POST', credentials:'include', headers:{'Content-Type':'application/json'}, body:JSON.stringify({downloadsEnabled:$('downloads').checked,discordUrl:$('discord').value.trim()}) }); if (!response.ok) throw new Error((await response.json()).error || 'Save failed.'); await load(); $('status').textContent = 'Saved. Public controls are updated.'; } catch (error) { showError(error); } };
+      function showError(error) { $('status').textContent = error.message || 'Something went wrong.'; $('status').className = 'status error'; }
+      load().catch(showError);
+    </script>
+  </body>
+</html>
