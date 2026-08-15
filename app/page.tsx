@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable react-hooks/set-state-in-effect -- browser-only local workspace hydration intentionally restores persisted state after mount. */
 
-import { useEffect, useState, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent } from "react";
 
 const API_ORIGIN = "https://asv-ide-api.mist-fans24.workers.dev";
 const APP_VERSION = "0.1.0";
@@ -163,6 +163,7 @@ function Icon({ name }: { name: string }) {
 }
 
 export default function Home() {
+  const importInput = useRef<HTMLInputElement>(null);
   const [booting, setBooting] = useState(true);
   const [welcome, setWelcome] = useState(true);
   const [project, setProject] = useState<Project>({
@@ -305,6 +306,39 @@ export default function Home() {
     setFile(mainFile);
     setTerminal(`Deleted ${name}.`);
   };
+  const exportProject = () => {
+    const archive = JSON.stringify({ format: "asv-ide-project", version: 1, project }, null, 2);
+    const url = URL.createObjectURL(new Blob([archive], { type: "application/json" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${project.name || "asv-project"}.asv-project.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    setTerminal(`Exported ${project.name} as a portable AsV_IDE project.`);
+  };
+  const importProject = (event: ChangeEvent<HTMLInputElement>) => {
+    const selected = event.target.files?.[0];
+    event.target.value = "";
+    if (!selected) return;
+    if (selected.name.toLowerCase().endsWith(".apk")) {
+      setTerminal("APK opened as a binary archive. Inspection is safe; editing or rebuilding a signed APK requires Android build tools and the app owner's permission.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const archive = JSON.parse(String(reader.result)) as { format?: string; project?: Project };
+        if (archive.format !== "asv-ide-project" || !archive.project?.name || !archive.project?.language) throw new Error("invalid project");
+        setProject({ ...archive.project, files: archive.project.files || {} });
+        setFile("README.md");
+        setWelcome(false);
+        setTerminal(`Imported ${archive.project.name} locally.`);
+      } catch {
+        setTerminal("That file is not a valid AsV_IDE project export.");
+      }
+    };
+    reader.readAsText(selected);
+  };
   const run = () => {
     if (project.language === "HTML") {
       setTerminal(
@@ -385,6 +419,9 @@ export default function Home() {
           {project.name}
         </div>
         <div className="top-actions">
+          <input ref={importInput} className="hidden-file-input" type="file" accept=".json,.asv-project,.apk,application/json,application/vnd.android.package-archive" onChange={importProject} />
+          <button className="visual-button" onClick={() => importInput.current?.click()}>Import</button>
+          <button className="visual-button" onClick={exportProject}>Export</button>
           <button className="visual-button" onClick={() => setWelcome(true)}>
             ＋ Project
           </button>

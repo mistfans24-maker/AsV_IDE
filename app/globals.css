@@ -22,6 +22,9 @@ button {
   font: inherit;
   cursor: pointer;
 }
+.hidden-file-input {
+  display: none;
+}
 .ide-shell {
   min-height: 100vh;
   background:

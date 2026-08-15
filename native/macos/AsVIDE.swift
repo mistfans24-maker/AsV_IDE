@@ -34,6 +34,12 @@ final class MediaBridge: NSObject, WKScriptMessageHandler {
 
 final class ExecutorBridge: NSObject, WKScriptMessageHandler {
   weak var webView: WKWebView?
+  private func processCommand(_ command: String, file: URL) -> (URL, [String]) {
+    if command == "node", let bundledNode = Bundle.main.resourceURL?.appendingPathComponent("runtime/node"), FileManager.default.isExecutableFile(atPath: bundledNode.path) {
+      return (bundledNode, [file.path])
+    }
+    return (URL(fileURLWithPath: "/usr/bin/env"), [command, file.path])
+  }
   func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
     guard message.name == "asvExecute", let payload = message.body as? [String: String], let language = payload["language"], let code = payload["code"] else { return }
     let commands = ["Python": ("python3", "py"), "Ruby": ("ruby", "rb"), "Lua": ("lua", "lua"), "JavaScript": ("node", "js")]
@@ -44,7 +50,8 @@ final class ExecutorBridge: NSObject, WKScriptMessageHandler {
       do {
         try code.write(to: file, atomically: true, encoding: .utf8)
         let process = Process(); let pipe = Pipe()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/env"); process.arguments = [command.0, file.path]
+        let invocation = self?.processCommand(command.0, file: file) ?? (URL(fileURLWithPath: "/usr/bin/env"), [command.0, file.path])
+        process.executableURL = invocation.0; process.arguments = invocation.1
         process.standardOutput = pipe; process.standardError = pipe
         try process.run()
         DispatchQueue.global().asyncAfter(deadline: .now() + 8) { if process.isRunning { process.terminate() } }
@@ -69,7 +76,13 @@ final class ServerBridge: NSObject, WKScriptMessageHandler {
     let file = FileManager.default.temporaryDirectory.appendingPathComponent("asv-server-\(UUID().uuidString).\(command.1)")
     do {
       try code.write(to: file, atomically: true, encoding: .utf8)
-      let process = Process(); let pipe = Pipe(); process.executableURL = URL(fileURLWithPath: "/usr/bin/env"); process.arguments = [command.0, file.path]; process.standardOutput = pipe; process.standardError = pipe
+      let process = Process(); let pipe = Pipe()
+      if command.0 == "node", let bundledNode = Bundle.main.resourceURL?.appendingPathComponent("runtime/node"), FileManager.default.isExecutableFile(atPath: bundledNode.path) {
+        process.executableURL = bundledNode; process.arguments = [file.path]
+      } else {
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/env"); process.arguments = [command.0, file.path]
+      }
+      process.standardOutput = pipe; process.standardError = pipe
       try process.run(); servers.append(process)
       DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self, weak process] in
         guard let self else { return }
