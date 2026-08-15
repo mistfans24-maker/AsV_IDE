@@ -2184,9 +2184,49 @@ footer b {
   line-height: 1.5;
 }
 .login-modal {
-  width: min(670px, calc(100vw - 30px));
-  background: linear-gradient(145deg, #123139 0%, #081c22 68%);
+  width: min(760px, calc(100vw - 30px));
+  padding: 34px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 88% 5%, color-mix(in srgb, var(--teal) 20%, transparent), transparent 26%),
+    linear-gradient(145deg, #123139 0%, #081c22 68%);
 }
+.login-modal::after {
+  content: "";
+  position: absolute;
+  width: 240px;
+  height: 240px;
+  right: -130px;
+  bottom: -130px;
+  border: 1px solid color-mix(in srgb, var(--teal) 42%, transparent);
+  border-radius: 50%;
+  box-shadow: 0 0 0 30px color-mix(in srgb, var(--teal) 4%, transparent), 0 0 0 60px color-mix(in srgb, var(--teal) 3%, transparent);
+  pointer-events: none;
+}
+.login-heading {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+.login-heading h2 { margin: 4px 0 0; }
+.login-mark {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border: 1px solid #3d8885;
+  border-radius: 13px;
+  background: #0a242b;
+  box-shadow: 0 0 28px color-mix(in srgb, var(--teal) 16%, transparent);
+  color: #dcfffa;
+  font-size: 24px;
+  font-style: normal;
+  font-weight: 900;
+  letter-spacing: -0.22em;
+  transform: skew(-8deg);
+}
+.login-mark i { color: var(--teal); font-style: normal; }
 .login-providers {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -2229,6 +2269,32 @@ footer b {
 .login-providers .discord-provider {
   border-color: var(--aqua);
   background: linear-gradient(135deg, #102d35, #123f41);
+}
+.provider-badge {
+  display: grid;
+  width: 25px;
+  height: 25px;
+  margin-bottom: 10px;
+  place-items: center;
+  border-radius: 8px;
+  background: #18393e;
+  color: var(--aqua);
+  font-size: 12px;
+  font-weight: 800;
+}
+.discord-badge { background: #5765f2; color: white; }
+.google-badge { background: #f3f7f7; color: #2574d9; }
+.github-badge { background: #222f34; color: #d9f6f1; }
+.login-status {
+  position: relative;
+  z-index: 1;
+  margin: -4px 0 16px !important;
+  padding: 9px 11px;
+  border: 1px solid #387275;
+  border-radius: 7px;
+  background: #0a2429;
+  color: var(--aqua) !important;
+  font-size: 10px !important;
 }
 .login-trust {
   display: flex;

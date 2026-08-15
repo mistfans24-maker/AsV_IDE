@@ -176,6 +176,7 @@ export default function Home() {
   const [file, setFile] = useState("README.md");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
+  const [loginStatus, setLoginStatus] = useState("");
   const [newFileOpen, setNewFileOpen] = useState(false);
   const [newFileName, setNewFileName] = useState("");
   const [adminMode, setAdminMode] = useState(false);
@@ -210,6 +211,19 @@ export default function Home() {
     return () => window.clearTimeout(timer);
   }, []);
   useEffect(() => {
+    const query = new URLSearchParams(window.location.search);
+    const outcome = query.get("oauth");
+    if (!outcome) return;
+    const provider = query.get("provider") || "account";
+    if (outcome === "error") {
+      setLoginOpen(true);
+      setLoginStatus(`Could not finish ${provider} sign-in. Please try again.`);
+    } else {
+      setLoginStatus(`${provider} sign-in complete. Restoring your profile…`);
+    }
+    window.history.replaceState({}, "", window.location.pathname);
+  }, []);
+  useEffect(() => {
     if (loaded)
       localStorage.setItem(
         "asv-ide-workspace",
@@ -234,6 +248,7 @@ export default function Home() {
           setDisplayAvatar(session.user.avatar || "");
           setLoginOpen(false);
           setTerminal(`Signed in as ${session.user.name}.`);
+          setLoginStatus("");
         }
       } catch {
         /* Offline/local use remains fully functional without sign-in. */
@@ -600,8 +615,15 @@ export default function Home() {
       {loginOpen && (
         <Login
           onClose={() => setLoginOpen(false)}
-          onDiscord={() => window.location.assign(`${API_ORIGIN}/auth/discord/start`)}
-          onGoogle={() => window.location.assign(`${API_ORIGIN}/auth/google/start`)}
+          onDiscord={() => {
+            setLoginStatus("Opening Discord’s secure sign-in…");
+            window.location.assign(`${API_ORIGIN}/auth/discord/start`);
+          }}
+          onGoogle={() => {
+            setLoginStatus("Opening Google’s secure sign-in…");
+            window.location.assign(`${API_ORIGIN}/auth/google/start`);
+          }}
+          status={loginStatus}
         />
       )}
     </main>
@@ -1100,10 +1122,12 @@ function Login({
   onClose,
   onDiscord,
   onGoogle,
+  status,
 }: {
   onClose: () => void;
   onDiscord: () => void;
   onGoogle: () => void;
+  status: string;
 }) {
   return (
     <div className="modal-back">
@@ -1111,33 +1135,33 @@ function Login({
         <button className="modal-close" onClick={onClose}>
           ×
         </button>
-        <span className="eyebrow">ACCOUNT</span>
-        <h2>Sign in to AsV_IDE</h2>
-        <p>
-          Your display name appears in the welcome screen after a connected
-          provider returns it.
-        </p>
+        <div className="login-heading">
+          <div className="login-mark" aria-hidden="true"><b>A</b><i>V</i></div>
+          <div><span className="eyebrow">ASV ACCOUNT</span><h2>Your workspace, recognised.</h2></div>
+        </div>
+        <p>Sign in to show your name and avatar across AsV_IDE. Projects, code, and API keys stay on this computer.</p>
         <div className="login-providers">
           <section className="discord-provider">
-            <b>Discord</b>
-            <small>Sign in with your Discord display name and avatar.</small>
+            <span className="provider-badge discord-badge">◉</span><b>Discord</b>
+            <small>Fastest option. Uses your Discord display name and avatar.</small>
             <button className="primary" onClick={onDiscord}>
               Continue with Discord
             </button>
           </section>
           <section>
-            <b>Google</b>
-            <small>Sign in with your Google name and profile photo.</small>
+            <span className="provider-badge google-badge">G</span><b>Google</b>
+            <small>Use your Google profile. Google may open a secure browser page.</small>
             <button className="primary" onClick={onGoogle}>
               Continue with Google
             </button>
           </section>
           <section>
-            <b>GitHub</b>
-            <small>Repository sync is coming after its OAuth client is configured.</small>
+            <span className="provider-badge github-badge">⌘</span><b>GitHub</b>
+            <small>Repository sync will appear here when its OAuth app is configured.</small>
             <button disabled aria-disabled="true">GitHub coming soon</button>
           </section>
         </div>
+        {status && <p className="login-status" role="status">{status}</p>}
         <div className="login-trust">
           <span aria-hidden="true">◇</span>
           <div>

@@ -97,6 +97,24 @@ final class ServerBridge: NSObject, WKScriptMessageHandler {
 final class StartupNavigation: NSObject, WKNavigationDelegate {
   private var attempts = 0
   func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { attempts = 0 }
+  func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+    guard let url = navigationAction.request.url,
+          url.host == "mistfans24-maker.github.io",
+          url.path == "/AsV_IDE/",
+          let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+          components.queryItems?.contains(where: { $0.name == "oauth" }) == true else {
+      decisionHandler(.allow)
+      return
+    }
+    // OAuth was completed in this WebView. Return to the local workspace while
+    // retaining the secure Worker session cookie in WebKit's data store.
+    let result = components.queryItems?.first(where: { $0.name == "oauth" })?.value ?? "error"
+    let provider = components.queryItems?.first(where: { $0.name == "provider" })?.value ?? "account"
+    decisionHandler(.cancel)
+    DispatchQueue.main.async {
+      webView.load(URLRequest(url: URL(string: "http://127.0.0.1:3210/?oauth=\(result)&provider=\(provider)")!))
+    }
+  }
   func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation?, withError error: Error) {
     guard attempts < 20 else {
       webView.loadHTMLString("<body style='margin:0;background:#08161b;color:#d8f4f0;font:15px -apple-system,system-ui;display:grid;place-items:center;height:100vh;text-align:center'><div><b>AsV_IDE could not start its local workspace.</b><p style='color:#7fa1a5'>Close the app and open it again.</p></div></body>", baseURL: nil)
