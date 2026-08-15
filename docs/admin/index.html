@@ -37,7 +37,7 @@
         $('availability').textContent = data.config.downloadsEnabled ? 'Public downloads are live.' : 'Downloads are paused.';
         $('status').textContent = 'Dashboard up to date.';
       }
-      $('signIn').onclick = () => location.href = api + '/auth/discord/start';
+      $('signIn').onclick = () => location.href = api + '/auth/discord/start?returnTo=' + encodeURIComponent('/AsV_IDE/admin/');
       $('refresh').onclick = () => load().catch(showError);
       $('save').onclick = async () => { try { $('status').textContent = 'Saving…'; const response = await fetch(api + '/v1/admin/config', { method:'POST', credentials:'include', headers:{'Content-Type':'application/json'}, body:JSON.stringify({downloadsEnabled:$('downloads').checked,discordUrl:$('discord').value.trim()}) }); if (!response.ok) throw new Error((await response.json()).error || 'Save failed.'); await load(); $('status').textContent = 'Saved. Public controls are updated.'; } catch (error) { showError(error); } };
       function showError(error) { $('status').textContent = error.message || 'Something went wrong.'; $('status').className = 'status error'; }
