@@ -2179,6 +2179,21 @@ footer b {
   color: var(--aqua);
   font-size: 10px;
 }
+.login-providers .discord-provider {
+  border-color: var(--aqua);
+  background: linear-gradient(135deg, #102d35, #123f41);
+}
+.account-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.account-button img {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  object-fit: cover;
+}
 .admin-login input,
 .admin-panel textarea {
   display: block;

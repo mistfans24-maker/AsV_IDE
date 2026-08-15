@@ -3,6 +3,8 @@
 
 import { useEffect, useState, type KeyboardEvent } from "react";
 
+const API_ORIGIN = "https://asv-ide-api.mist-fans24.workers.dev";
+
 const templates: Record<string, string> = {
   "Arduino C++": `#include <Arduino.h>
 
@@ -168,6 +170,7 @@ export default function Home() {
   const [newFileName, setNewFileName] = useState("");
   const [adminMode, setAdminMode] = useState(false);
   const [displayName, setDisplayName] = useState("");
+  const [displayAvatar, setDisplayAvatar] = useState("");
   const [notebook, setNotebook] = useState(false);
   const [terminal, setTerminal] = useState("Ready to work locally.");
   const [about, setAbout] = useState(
@@ -189,6 +192,7 @@ export default function Home() {
       if (saved?.hiring) setHiring(saved.hiring);
       if (saved?.adminMode) setAdminMode(true);
       if (saved?.displayName) setDisplayName(saved.displayName);
+      if (saved?.displayAvatar) setDisplayAvatar(saved.displayAvatar);
     } catch {
       /* keep the default workspace */
     }
@@ -206,9 +210,27 @@ export default function Home() {
           hiring,
           adminMode,
           displayName,
+          displayAvatar,
         }),
       );
-  }, [loaded, project, theme, about, hiring, adminMode, displayName]);
+  }, [loaded, project, theme, about, hiring, adminMode, displayName, displayAvatar]);
+  useEffect(() => {
+    const restoreSession = async () => {
+      try {
+        const response = await fetch(`${API_ORIGIN}/auth/session`, { credentials: "include" });
+        const session = await response.json() as { authenticated?: boolean; user?: { name?: string; avatar?: string | null } };
+        if (session.authenticated && session.user?.name) {
+          setDisplayName(session.user.name);
+          setDisplayAvatar(session.user.avatar || "");
+          setLoginOpen(false);
+          setTerminal(`Signed in as ${session.user.name}.`);
+        }
+      } catch {
+        /* Offline/local use remains fully functional without sign-in. */
+      }
+    };
+    void restoreSession();
+  }, []);
   useEffect(() => {
     const receive = (event: Event) =>
       setTerminal((event as CustomEvent<string>).detail);
@@ -357,7 +379,8 @@ export default function Home() {
           <button className="visual-button" onClick={() => setWelcome(true)}>
             ＋ Project
           </button>
-          <button className="visual-button" onClick={() => setLoginOpen(true)}>
+          <button className="visual-button account-button" onClick={() => setLoginOpen(true)}>
+            {displayAvatar && <img src={displayAvatar} alt="" referrerPolicy="no-referrer" />}
             {displayName ? `Hi, ${displayName}` : "Sign in"}
           </button>
           <button className="visual-button" onClick={() => setNotebook(true)}>
@@ -528,7 +551,7 @@ export default function Home() {
           onClose={() => setSettingsOpen(false)}
         />
       )}
-      {loginOpen && <Login onClose={() => setLoginOpen(false)} />}
+      {loginOpen && <Login onClose={() => setLoginOpen(false)} onDiscord={() => { window.location.assign(`${API_ORIGIN}/auth/discord/start`); }} />}
     </main>
   );
 }
@@ -1021,7 +1044,7 @@ function Editor({
     </>
   );
 }
-function Login({ onClose }: { onClose: () => void }) {
+function Login({ onClose, onDiscord }: { onClose: () => void; onDiscord: () => void }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState(
@@ -1045,6 +1068,13 @@ function Login({ onClose }: { onClose: () => void }) {
           provider returns it.
         </p>
         <div className="login-providers">
+          <section className="discord-provider">
+            <b>Discord</b>
+            <small>Sign in with your Discord display name and avatar.</small>
+            <button className="primary" onClick={onDiscord}>
+              Continue with Discord
+            </button>
+          </section>
           <section>
             <b>Google</b>
             <small>Continue with Google after OAuth is configured.</small>
