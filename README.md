@@ -66,6 +66,12 @@ npm run build
 - Never commit `.env` files, OAuth client secrets, SSH keys, or API keys. They are ignored by default.
 - Google/GitHub sign-in is intentionally not live yet. Real OAuth needs a deployed private backend, server-side session handling, and registered callback URLs.
 - GitHub Pages can host static sites, but it cannot safely run the OAuth backend or the current server-rendered app by itself.
+
+## Edit the public website without Codex
+
+The public GitHub Pages site has a single beginner-friendly settings file at [`docs/site-settings.json`](docs/site-settings.json). Edit it directly on GitHub to change homepage wording, the animated hero words, founder details, Discord, support email, or a Buy Me a Coffee link. Full click-by-click instructions are in [`docs/EDIT_WEBSITE.md`](docs/EDIT_WEBSITE.md).
+
+Never put API keys, OAuth secrets, passwords, or tokens in that file: it is public.
 - Templates make a language ready to edit; they do not bundle every compiler, interpreter, package manager, debugger, or device toolchain. Install the runtime/toolchain you need locally before execution support can be added.
 - This project is not yet a replacement for Arduino IDE/PlatformIO for board flashing. Treat ESP32/Arduino integration as work in progress.
 

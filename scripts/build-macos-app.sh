@@ -5,14 +5,16 @@ OUT="$ROOT/outputs/AsV_IDE.app"
 rm -rf "$OUT"
 mkdir -p "$OUT/Contents/MacOS" "$OUT/Contents/Resources" "$ROOT/work"
 ICONSET="$ROOT/work/AsV_IDE.iconset"
+ICON_SOURCE="$ROOT/work/asv-icon-source.png"
+ICON_MASTER="$ROOT/work/asv-icon-master.png"
 rm -rf "$ICONSET"
 mkdir -p "$ICONSET"
-sips -s format png "$ROOT/public/asv-logo.png" --resampleWidth 920 --out "$ICONSET/source.png" >/dev/null
-sips --padToHeightWidth 1024 1024 --padColor 0A1B20 "$ICONSET/source.png" --out "$ICONSET/master.png" >/dev/null
+sips -s format png "$ROOT/public/asv-logo.png" --resampleWidth 920 --out "$ICON_SOURCE" >/dev/null
+sips --padToHeightWidth 1024 1024 --padColor 0A1B20 "$ICON_SOURCE" --out "$ICON_MASTER" >/dev/null
 for size in 16 32 128 256 512; do
-  sips -z "$size" "$size" "$ICONSET/master.png" --out "$ICONSET/icon_${size}x${size}.png" >/dev/null
+  sips -z "$size" "$size" "$ICON_MASTER" --out "$ICONSET/icon_${size}x${size}.png" >/dev/null
   doubled=$((size * 2))
-  sips -z "$doubled" "$doubled" "$ICONSET/master.png" --out "$ICONSET/icon_${size}x${size}@2x.png" >/dev/null
+  sips -z "$doubled" "$doubled" "$ICON_MASTER" --out "$ICONSET/icon_${size}x${size}@2x.png" >/dev/null
 done
 iconutil -c icns "$ICONSET" -o "$OUT/Contents/Resources/AsV_IDE.icns"
 sed "s|__PROJECT_ROOT__|$ROOT|g" "$ROOT/native/macos/AsVIDE.swift" > "$ROOT/work/AsVIDE.swift"

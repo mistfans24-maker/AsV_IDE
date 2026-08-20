@@ -80,7 +80,15 @@ const languageFiles: Record<string, string> = {
   Markdown: "notes.md",
   "Plain Text": "notes.txt",
 };
-const localRuntimes = new Set(["Python", "JavaScript", "Lua", "Ruby"]);
+const localRuntimes = new Set([
+  "Python",
+  "JavaScript",
+  "Lua",
+  "Ruby",
+  "Bash",
+  "PHP",
+  "R",
+]);
 const themes = ["aurora", "midnight", "neon", "sunset"];
 const glyphs = "リ∆⟟꙰ꖎ⚚ᔑ╎ᓭ⍊ᒷℸ ̣ᓵᓵ∴";
 const welcomeText: Record<
@@ -457,7 +465,14 @@ export default function Home() {
     }
     const runner = (
       window as Window & {
-        asvExecutor?: { run: (language: string, code: string) => void };
+        asvExecutor?: {
+          run: (
+            language: string,
+            code: string,
+            files?: Record<string, string>,
+            fileName?: string,
+          ) => void;
+        };
       }
     ).asvExecutor;
     if (!runner) {
@@ -468,12 +483,18 @@ export default function Home() {
     }
     if (!localRuntimes.has(project.language)) {
       writeTerminal(
-        `${project.language} is ready to edit. Running it needs its local compiler/runtime, which is not bundled yet.`,
+        `${project.language} can be edited here, but its local compiler/runtime, which is not bundled yet, is required. Use Python, JavaScript, Ruby, Lua, Bash, PHP, or R for direct local execution.`,
       );
       return;
     }
-    writeTerminal(`Running ${project.language} locally…`);
-    runner.run(project.language, project.code);
+    const workspaceFiles = {
+      [mainFile]: project.code,
+      ...(project.files || {}),
+    };
+    writeTerminal(
+      `Running ${project.language} locally from ${mainFile} with ${Object.keys(workspaceFiles).length} project file(s)…`,
+    );
+    runner.run(project.language, project.code, workspaceFiles, mainFile);
   };
   const hostLocalProject = () => {
     if (!new Set(["Python", "JavaScript"]).has(project.language)) {

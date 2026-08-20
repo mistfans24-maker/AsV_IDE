@@ -40,25 +40,65 @@ final class ExecutorBridge: NSObject, WKScriptMessageHandler {
     }
     return (URL(fileURLWithPath: "/usr/bin/env"), [command, file.path])
   }
+  private func safeRelativePath(_ candidate: String) -> String? {
+    let normalized = candidate.replacingOccurrences(of: "\\", with: "/")
+    guard !normalized.hasPrefix("/"), !normalized.isEmpty else { return nil }
+    let parts = normalized.split(separator: "/", omittingEmptySubsequences: true)
+    guard !parts.isEmpty, !parts.contains(where: { $0 == "." || $0 == ".." }) else { return nil }
+    return parts.joined(separator: "/")
+  }
+
+  private func workspace(from payload: [String: String], fallbackCode: String, fallbackExtension: String) throws -> (directory: URL, entry: URL) {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent("asv-run-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    var wroteFiles = false
+    if let archive = payload["files"], let data = archive.data(using: .utf8),
+       let files = try JSONSerialization.jsonObject(with: data) as? [String: String] {
+      for (name, contents) in files {
+        guard let safeName = safeRelativePath(name) else { continue }
+        let destination = root.appendingPathComponent(safeName)
+        try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try contents.write(to: destination, atomically: true, encoding: .utf8)
+        wroteFiles = true
+      }
+    }
+    let requestedName = payload["fileName"].flatMap(safeRelativePath)
+    let defaultName = "main.\(fallbackExtension)"
+    let entryName = requestedName ?? defaultName
+    let entry = root.appendingPathComponent(entryName)
+    if !FileManager.default.fileExists(atPath: entry.path) {
+      try FileManager.default.createDirectory(at: entry.deletingLastPathComponent(), withIntermediateDirectories: true)
+      try fallbackCode.write(to: entry, atomically: true, encoding: .utf8)
+    } else if !wroteFiles {
+      try fallbackCode.write(to: entry, atomically: true, encoding: .utf8)
+    }
+    return (root, entry)
+  }
+
   func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
     guard message.name == "asvExecute", let payload = message.body as? [String: String], let language = payload["language"], let code = payload["code"] else { return }
-    let commands = ["Python": ("python3", "py"), "Ruby": ("ruby", "rb"), "Lua": ("lua", "lua"), "JavaScript": ("node", "js")]
-    guard let command = commands[language] else { publish("This language is not a local script runtime."); return }
+    // These are direct local runtimes. They execute on the user's Mac, never
+    // on the website or Cloudflare Worker.
+    let commands = ["Python": ("python3", "py"), "Ruby": ("ruby", "rb"), "Lua": ("lua", "lua"), "JavaScript": ("node", "js"), "Bash": ("bash", "sh"), "PHP": ("php", "php"), "R": ("Rscript", "R")]
+    guard let command = commands[language] else { publish("\(language) needs a local compiler or runtime that is not configured in this build. Python, JavaScript, Ruby, Lua, Bash, PHP, and R can run directly when installed."); return }
     DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-      let file = FileManager.default.temporaryDirectory.appendingPathComponent("asv-run-\(UUID().uuidString).\(command.1)")
-      defer { try? FileManager.default.removeItem(at: file) }
+      guard let self else { return }
       do {
-        try code.write(to: file, atomically: true, encoding: .utf8)
+        let prepared = try self.workspace(from: payload, fallbackCode: code, fallbackExtension: command.1)
+        defer { try? FileManager.default.removeItem(at: prepared.directory) }
         let process = Process(); let pipe = Pipe()
-        let invocation = self?.processCommand(command.0, file: file) ?? (URL(fileURLWithPath: "/usr/bin/env"), [command.0, file.path])
+        let invocation = self.processCommand(command.0, file: prepared.entry)
         process.executableURL = invocation.0; process.arguments = invocation.1
+        process.currentDirectoryURL = prepared.directory
         process.standardOutput = pipe; process.standardError = pipe
         try process.run()
-        DispatchQueue.global().asyncAfter(deadline: .now() + 8) { if process.isRunning { process.terminate() } }
+        DispatchQueue.global().asyncAfter(deadline: .now() + 30) { if process.isRunning { process.terminate() } }
         process.waitUntilExit()
         let output = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
-        self?.publish(output.isEmpty ? "Finished successfully." : output)
-      } catch { self?.publish("Could not run \(language): \(error.localizedDescription)") }
+        let status = process.terminationStatus
+        let result = output.isEmpty ? (status == 0 ? "Finished successfully." : "Process stopped with exit code \(status).") : output
+        self.publish(result)
+      } catch { self.publish("Could not run \(language): \(error.localizedDescription)") }
     }
   }
   private func publish(_ output: String) {
@@ -231,7 +271,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
     task.standardOutput = FileHandle.nullDevice; task.standardError = FileHandle.nullDevice; try? task.run(); server = task
     let content = WKUserContentController(); content.add(bridge, name: "asvVault"); content.add(media, name: "asvMedia"); content.add(executor, name: "asvExecute"); content.add(localServer, name: "asvServer"); content.add(projectBridge, name: "asvProject")
-    content.addUserScript(WKUserScript(source: "window.asvVault={save:(provider,key)=>window.webkit.messageHandlers.asvVault.postMessage({provider:provider,key:key})};window.asvMedia={control:(action)=>window.webkit.messageHandlers.asvMedia.postMessage({action:action})};window.asvExecutor={run:(language,code)=>window.webkit.messageHandlers.asvExecute.postMessage({language:language,code:code})};window.asvServer={start:(language,code,port)=>window.webkit.messageHandlers.asvServer.postMessage({language:language,code:code,port:port}),stop:()=>window.webkit.messageHandlers.asvServer.postMessage({action:'stop'})};window.asvProject={import:()=>window.webkit.messageHandlers.asvProject.postMessage({action:'import'}),export:(name,archive)=>window.webkit.messageHandlers.asvProject.postMessage({action:'export',name:name,archive:archive})};", injectionTime: .atDocumentStart, forMainFrameOnly: true))
+    content.addUserScript(WKUserScript(source: "window.asvVault={save:(provider,key)=>window.webkit.messageHandlers.asvVault.postMessage({provider:provider,key:key})};window.asvMedia={control:(action)=>window.webkit.messageHandlers.asvMedia.postMessage({action:action})};window.asvExecutor={run:(language,code,files,fileName)=>window.webkit.messageHandlers.asvExecute.postMessage({language:language,code:code,files:JSON.stringify(files||{}),fileName:fileName||''})};window.asvServer={start:(language,code,port)=>window.webkit.messageHandlers.asvServer.postMessage({language:language,code:code,port:port}),stop:()=>window.webkit.messageHandlers.asvServer.postMessage({action:'stop'})};window.asvProject={import:()=>window.webkit.messageHandlers.asvProject.postMessage({action:'import'}),export:(name,archive)=>window.webkit.messageHandlers.asvProject.postMessage({action:'export',name:name,archive:archive})};", injectionTime: .atDocumentStart, forMainFrameOnly: true))
     let config = WKWebViewConfiguration(); config.userContentController = content
     let view = WKWebView(frame: NSRect(x: 0, y: 0, width: 1280, height: 800), configuration: config)
     view.navigationDelegate = startupNavigation
