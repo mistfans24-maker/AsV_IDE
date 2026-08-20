@@ -133,6 +133,32 @@ type Project = {
   mainFile?: string;
   files?: Record<string, string>;
 };
+type SitePage = {
+  id: string;
+  title: string;
+  slug: string;
+  hero: string;
+  body: string;
+  published: boolean;
+};
+const starterSitePages: SitePage[] = [
+  {
+    id: "home",
+    title: "Home",
+    slug: "/",
+    hero: "Your ideas, in motion.",
+    body: "One beautiful, private workspace for code, notebooks, web apps, data experiments, scripts, and hardware.",
+    published: true,
+  },
+  {
+    id: "about",
+    title: "About",
+    slug: "/about",
+    hero: "Built for curious makers.",
+    body: "AsV_IDE is a local-first workspace designed to make starting feel irresistible.",
+    published: true,
+  },
+];
 
 function Icon({ name }: { name: string }) {
   const paths: Record<string, string> = {
@@ -148,6 +174,7 @@ function Icon({ name }: { name: string }) {
     Settings:
       "M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4Zm7-3.2 2-1.2-2-3.4-2.2.9a7.7 7.7 0 0 0-1.6-.9L15 5h-4l-.2 2.4a7.7 7.7 0 0 0-1.6.9L7 7.4l-2 3.4L7 12a7.7 7.7 0 0 0 0 1.8L5 15l2 3.4 2.2-.9a7.7 7.7 0 0 0 1.6.9L11 21h4l.2-2.4a7.7 7.7 0 0 0 1.6-.9l2.2.9 2-3.4-2-1.2a7.7 7.7 0 0 0 0-2Z",
     Notebook: "M5 3h11a3 3 0 0 1 3 3v15H8a3 3 0 0 0-3 0zm3 3h8m-8 4h8m-8 4h5",
+    Website: "M4 4h16v16H4zM4 9h16M9 4c2 2.2 2 13.8 0 16M15 4c-2 2.2-2 13.8 0 16",
   };
   return (
     <svg
@@ -192,6 +219,8 @@ export default function Home() {
   const [displayName, setDisplayName] = useState("");
   const [displayAvatar, setDisplayAvatar] = useState("");
   const [notebook, setNotebook] = useState(false);
+  const [sitePages, setSitePages] = useState<SitePage[]>(starterSitePages);
+  const [sitePageId, setSitePageId] = useState("home");
   const [terminal, setTerminal] = useState("Ready to work locally.");
   const [about, setAbout] = useState(
     "AsV_IDE is built by makers who believe great tools should stay local, fast, and yours.",
@@ -214,6 +243,10 @@ export default function Home() {
       if (saved?.adminMode) setAdminMode(true);
       if (saved?.displayName) setDisplayName(saved.displayName);
       if (saved?.displayAvatar) setDisplayAvatar(saved.displayAvatar);
+      if (Array.isArray(saved?.sitePages) && saved.sitePages.length) {
+        setSitePages(saved.sitePages);
+        setSitePageId(saved.sitePages[0].id);
+      }
     } catch {
       /* keep the default workspace */
     }
@@ -258,9 +291,10 @@ export default function Home() {
           adminMode,
           displayName,
           displayAvatar,
+          sitePages,
         }),
       );
-  }, [loaded, project, theme, about, hiring, adminMode, displayName, displayAvatar]);
+  }, [loaded, project, theme, about, hiring, adminMode, displayName, displayAvatar, sitePages]);
   useEffect(() => {
     const restoreSession = async () => {
       try {
@@ -446,6 +480,11 @@ export default function Home() {
     importInput.current?.click();
   };
   const run = () => {
+    const problem = diagnoseCode(project.code, project.language);
+    if (problem) {
+      writeTerminal(`${problem} Use “Fix issue” below the editor, then run again.`);
+      return;
+    }
     const isMicroPython =
       project.language === "MicroPython" ||
       /(^|\n)\s*(from\s+machine\s+import|import\s+machine\b)/m.test(
@@ -562,6 +601,7 @@ export default function Home() {
     "Search",
     "Source Control",
     "Extensions",
+    "Website",
     "Device",
     "About Us",
     ...(adminMode ? ["Admin"] : []),
@@ -667,6 +707,14 @@ export default function Home() {
               hiring={hiring}
               setHiring={setHiring}
             />
+          ) : active === "Website" ? (
+            <SiteStudio
+              pages={sitePages}
+              selectedId={sitePageId}
+              onSelect={setSitePageId}
+              onPagesChange={setSitePages}
+              onNotify={writeTerminal}
+            />
           ) : (
             <>
               <div className="editor-tabs">
@@ -695,6 +743,7 @@ export default function Home() {
                   code={selectedCode}
                   language={project.language}
                   setCode={updateFile}
+                  problem={diagnoseCode(selectedCode, project.language)}
                 />
               )}
             </>
@@ -740,7 +789,7 @@ export default function Home() {
             <b>TERMINAL</b>
             <span>OUTPUT</span>
             <span>
-              PROBLEMS <i>0</i>
+              PROBLEMS <i>{diagnoseCode(selectedCode, project.language) ? 1 : 0}</i>
             </span>
           </div>
           <button onClick={() => setTerminal("Console cleared.")}>Clear</button>
@@ -1074,6 +1123,17 @@ function Sidebar({
         </small>
       </div>
     );
+  if (active === "Website")
+    return (
+      <div className="sidebar-message">
+        <b>Website Studio</b>
+        <small>
+          Create and edit pages visually, then export one portable site file.
+          Publishing still needs a connected GitHub or hosting workflow.
+        </small>
+        <button onClick={() => onNotify("Website Studio is open. Add pages, edit their copy, then use Export to save a portable site archive.")}>How publishing works</button>
+      </div>
+    );
   if (active === "About Us")
     return (
       <div className="sidebar-message about-panel">
@@ -1185,6 +1245,17 @@ function NewFileModal({
     </div>
   );
 }
+function diagnoseCode(code: string, language: string) {
+  if (language !== "Python") return "";
+  const lines = code.split("\n");
+  for (const [index, line] of lines.entries()) {
+    const control = line.match(/^\s*(?:if|elif|while)\s+(.+):\s*$/);
+    if (control && /(^|[^=!<>])\s*=\s*(?!=)/.test(control[1])) {
+      return `Line ${index + 1}: Python compares values with ==, not =.`;
+    }
+  }
+  return "";
+}
 function formatCode(code: string, language: string) {
   if (language !== "Python")
     return code
@@ -1193,23 +1264,31 @@ function formatCode(code: string, language: string) {
       .join("\n");
   return code
     .split("\n")
-    .map((line) =>
-      line
+    .map((rawLine) => {
+      const line = rawLine
         .replace(/[ \t]+$/g, "")
         .replace(/\s+:/g, ":")
+        .replace(/\b(if|elif|while|for|def|class)\s+/g, "$1 ");
+      const control = line.match(/^(\s*(?:if|elif|while)\s+)(.*):\s*$/);
+      if (!control) return line.replace(/\s*==\s*/g, " == ");
+      const comparison = control[2]
+        .replace(/(^|[^=!<>])\s*=\s*(?!=)/g, "$1 == ")
         .replace(/\s*==\s*/g, " == ")
-        .replace(/\b(if|elif|while|for|def|class)\s+/g, "$1 "),
-    )
+        .trim();
+      return `${control[1]}${comparison}:`;
+    })
     .join("\n");
 }
 function Editor({
   code,
   language,
   setCode,
+  problem,
 }: {
   code: string;
   language: string;
   setCode: (code: string) => void;
+  problem: string;
 }) {
   const [scrollTop, setScrollTop] = useState(0);
   const setCursor = (area: HTMLTextAreaElement, position: number) =>
@@ -1287,9 +1366,136 @@ function Editor({
         <button onClick={() => setCode(formatCode(code, language))}>
           Format code
         </button>
+        {problem && (
+          <button className="editor-problem" onClick={() => setCode(formatCode(code, language))} title={problem}>
+            Fix issue
+          </button>
+        )}
         <span>Tab = 2 spaces</span>
       </div>
     </>
+  );
+}
+function SiteStudio({
+  pages,
+  selectedId,
+  onSelect,
+  onPagesChange,
+  onNotify,
+}: {
+  pages: SitePage[];
+  selectedId: string;
+  onSelect: (id: string) => void;
+  onPagesChange: (pages: SitePage[]) => void;
+  onNotify: (message: string) => void;
+}) {
+  const importRef = useRef<HTMLInputElement>(null);
+  const selected = pages.find((page) => page.id === selectedId) || pages[0];
+  const update = (patch: Partial<SitePage>) =>
+    onPagesChange(pages.map((page) => (page.id === selected.id ? { ...page, ...patch } : page)));
+  const addPage = () => {
+    const index = pages.length + 1;
+    const id = `page-${Date.now()}`;
+    onPagesChange([
+      ...pages,
+      { id, title: `New page ${index}`, slug: `/new-page-${index}`, hero: "A new page is taking shape.", body: "Start writing the story you want visitors to see.", published: false },
+    ]);
+    onSelect(id);
+    onNotify("Created a new local website page.");
+  };
+  const duplicate = () => {
+    const id = `page-${Date.now()}`;
+    const path = selected.slug === "/" ? "/home-copy" : `${selected.slug.replace(/\/$/, "")}-copy`;
+    onPagesChange([...pages, { ...selected, id, title: `${selected.title} copy`, slug: path, published: false }]);
+    onSelect(id);
+    onNotify(`Duplicated ${selected.title}.`);
+  };
+  const remove = () => {
+    if (pages.length === 1) {
+      onNotify("Keep at least one page in your site.");
+      return;
+    }
+    const remaining = pages.filter((page) => page.id !== selected.id);
+    onPagesChange(remaining);
+    onSelect(remaining[0].id);
+    onNotify(`Deleted ${selected.title}.`);
+  };
+  const exportSite = () => {
+    const archive = JSON.stringify({ format: "asv-ide-site", version: 1, pages }, null, 2);
+    const url = URL.createObjectURL(new Blob([archive], { type: "application/json" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "asv-ide-site.json";
+    link.click();
+    URL.revokeObjectURL(url);
+    onNotify("Exported a portable website archive. Keep it in Git to version your pages.");
+  };
+  const importSite = (event: ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = event.target.files?.[0];
+    event.target.value = "";
+    if (!selectedFile) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const archive = JSON.parse(String(reader.result)) as { format?: string; pages?: SitePage[] };
+        if (archive.format !== "asv-ide-site" || !Array.isArray(archive.pages) || !archive.pages.length) throw new Error("invalid site");
+        const safePages = archive.pages.filter((page) => page && page.id && page.title && page.slug).map((page) => ({ ...page, hero: page.hero || "", body: page.body || "", published: Boolean(page.published) }));
+        if (!safePages.length) throw new Error("empty site");
+        onPagesChange(safePages);
+        onSelect(safePages[0].id);
+        onNotify(`Imported ${safePages.length} website page(s) locally.`);
+      } catch {
+        onNotify("That file is not a valid AsV_IDE website export.");
+      }
+    };
+    reader.readAsText(selectedFile);
+  };
+  return (
+    <article className="site-studio">
+      <header className="site-studio-head">
+        <div>
+          <span className="eyebrow">LOCAL WEBSITE STUDIO</span>
+          <h1>Build pages without touching code.</h1>
+          <p>Create pages, edit their copy, preview them, and save a portable site archive. Publishing is separate and stays under your control.</p>
+        </div>
+        <div className="site-studio-actions">
+          <input ref={importRef} className="hidden-file-input" type="file" accept="application/json,.json" onChange={importSite} />
+          <button onClick={addPage}>＋ Add page</button>
+          <button onClick={() => importRef.current?.click()}>Import site</button>
+          <button className="primary" onClick={exportSite}>Export site</button>
+        </div>
+      </header>
+      <div className="site-builder">
+        <aside className="site-pages">
+          <div className="site-section-label">PAGES <button onClick={addPage}>＋</button></div>
+          <div className="site-page-list">
+            {pages.map((page) => (
+              <button key={page.id} className={page.id === selected.id ? "selected" : ""} onClick={() => onSelect(page.id)}>
+                <span>{page.title}</span><small>{page.published ? "Published" : "Draft"}</small>
+              </button>
+            ))}
+          </div>
+          <div className="site-page-actions"><button onClick={duplicate}>Duplicate</button><button onClick={remove}>Delete</button></div>
+        </aside>
+        <section className="site-form">
+          <label>Page title<input value={selected.title} onChange={(event) => update({ title: event.target.value })} /></label>
+          <label>Page path<input value={selected.slug} onChange={(event) => update({ slug: event.target.value.startsWith("/") ? event.target.value : `/${event.target.value}` })} /></label>
+          <label>Headline<textarea value={selected.hero} onChange={(event) => update({ hero: event.target.value })} rows={3} /></label>
+          <label>Page content<textarea value={selected.body} onChange={(event) => update({ body: event.target.value })} rows={7} /></label>
+          <label className="publish-toggle"><input type="checkbox" checked={selected.published} onChange={(event) => update({ published: event.target.checked })} /><span>Mark as published in this local draft</span></label>
+          <small>Changes are autosaved on this computer. Export when you want a file you can commit to GitHub.</small>
+        </section>
+        <section className="site-preview">
+          <div className="site-preview-bar"><span>LIVE PREVIEW</span><small>{selected.published ? "PUBLISHED DRAFT" : "DRAFT"}</small></div>
+          <div className="site-preview-canvas">
+            <span>ASV_IDE · {selected.slug}</span>
+            <h2>{selected.hero || "Untitled page"}</h2>
+            <p>{selected.body || "Add content to preview this page."}</p>
+            <button>{selected.title || "Page"} →</button>
+          </div>
+        </section>
+      </div>
+    </article>
   );
 }
 function Login({

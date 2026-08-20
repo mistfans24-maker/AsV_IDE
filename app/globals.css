@@ -2747,3 +2747,47 @@ a:focus-visible {
     font-size: 50px;
   }
 }
+
+.editor-problem {
+  color: #ffe2a1 !important;
+  border-color: #a47b36 !important;
+}
+.site-studio {
+  min-width: 0;
+  overflow: auto;
+  padding: 28px;
+  background: radial-gradient(circle at 88% 4%, #164c4b88, transparent 31%), #071b20;
+}
+.site-studio-head { display: flex; justify-content: space-between; gap: 24px; align-items: flex-end; }
+.site-studio h1 { margin: 7px 0 9px; font-size: clamp(27px, 3vw, 44px); letter-spacing: -.055em; }
+.site-studio p { max-width: 670px; margin: 0; color: #8bb2b2; line-height: 1.55; }
+.site-studio-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.site-studio-actions button, .site-page-actions button, .site-pages button { font: inherit; }
+.site-studio-actions button, .site-page-actions button { padding: 9px 12px; color: #bcdfdc; border: 1px solid #34716f; border-radius: 7px; background: #0b292d; cursor: pointer; }
+.site-studio-actions .primary { background: var(--teal); color: #042126; border-color: var(--teal); font-weight: 700; }
+.site-builder { display: grid; grid-template-columns: 190px minmax(250px, 1fr) minmax(290px, 1.05fr); gap: 14px; margin-top: 25px; min-height: 470px; }
+.site-pages, .site-form, .site-preview { min-width: 0; border: 1px solid #285b5d; border-radius: 13px; background: #082329; }
+.site-pages { display: flex; flex-direction: column; }
+.site-section-label, .site-preview-bar { display: flex; align-items: center; justify-content: space-between; padding: 14px; border-bottom: 1px solid #244a50; color: #8fb8b6; font: 11px monospace; letter-spacing: .12em; }
+.site-section-label button { color: var(--teal); border: 0; background: transparent; font-size: 18px; cursor: pointer; }
+.site-page-list { padding: 8px; display: grid; gap: 6px; }
+.site-page-list button { width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 10px; color: #b6d6d5; border: 1px solid transparent; border-radius: 8px; background: transparent; text-align: left; cursor: pointer; }
+.site-page-list button.selected { border-color: #357f7b; background: #144448; color: #e2fbf8; }
+.site-page-list small { color: #71a1a0; font-size: 10px; }
+.site-page-actions { display: flex; gap: 7px; padding: 12px; margin-top: auto; border-top: 1px solid #244a50; }
+.site-page-actions button { flex: 1; }
+.site-form { padding: 18px; display: grid; align-content: start; gap: 13px; }
+.site-form label { display: grid; gap: 7px; color: #a8cdcb; font-size: 12px; }
+.site-form input:not([type="checkbox"]), .site-form textarea { width: 100%; box-sizing: border-box; resize: vertical; padding: 10px 11px; color: #d9f3f1; border: 1px solid #32676a; border-radius: 7px; outline: none; background: #061b20; font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.site-form input:focus, .site-form textarea:focus { border-color: var(--teal); box-shadow: 0 0 0 3px #24d8cb22; }
+.site-form .publish-toggle { grid-template-columns: auto 1fr; align-items: center; gap: 9px; }
+.site-form small { color: #719b9b; line-height: 1.5; }
+.site-preview { overflow: hidden; }
+.site-preview-bar small { color: var(--teal); font-size: 10px; }
+.site-preview-canvas { min-height: 405px; margin: 12px; padding: 26px; border: 1px solid #367271; border-radius: 9px; background: radial-gradient(circle at 88% 12%, #12615d, transparent 37%), #061a20; }
+.site-preview-canvas > span { color: var(--teal); font: 11px monospace; letter-spacing: .12em; }
+.site-preview-canvas h2 { max-width: 430px; margin: 64px 0 14px; color: #e2fbf8; font-size: clamp(29px, 3vw, 46px); line-height: .98; letter-spacing: -.06em; }
+.site-preview-canvas p { max-width: 430px; }
+.site-preview-canvas button { margin-top: 22px; padding: 10px 14px; color: #032127; border: 0; border-radius: 7px; background: var(--teal); font-weight: 700; }
+@media (max-width: 1120px) { .site-studio-head { align-items: flex-start; flex-direction: column; } .site-studio-actions { justify-content: flex-start; } .site-builder { grid-template-columns: 170px minmax(240px, 1fr); } .site-preview { grid-column: 1 / -1; } .site-preview-canvas { min-height: 250px; } .site-preview-canvas h2 { margin-top: 34px; } }
+@media (max-width: 720px) { .site-studio { padding: 16px; } .site-builder { grid-template-columns: 1fr; } .site-preview { grid-column: auto; } }
